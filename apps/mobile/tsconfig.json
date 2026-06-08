@@ -1,0 +1,15 @@
+{
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "module": "esnext",
+    "paths": {
+      "@/*": ["src/*"],
+      "@pawspace/shared": ["../../packages/shared/src"]
+    }
+  },
+  "include": ["src/**/*", "../../index.js", "../../App.tsx"],
+  "exclude": ["node_modules"]
+}

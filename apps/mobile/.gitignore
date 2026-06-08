@@ -1,0 +1,42 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+
+# Android
+android/.gradle
+android/build
+android/app/build
+android/app/.cxx
+
+# iOS
+ios/Pods
+ios/build
+
+# Expo
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Metro
+.metro-health-check*
+
+# ENV
+.env
+.env.local
+
+# Misc
+*.log
+
+# Expo
+.expo
+dist/
+web-build/

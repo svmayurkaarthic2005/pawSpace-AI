@@ -21,6 +21,7 @@ This is a monorepo containing:
 - 🔔 Real-time push notifications
 - 👤 User profiles and pet profiles
 - 🔍 AI-enhanced explore and search functionality
+- 📸 Swipeable onboarding with custom app logo
 
 ## 🚀 Getting Started
 
@@ -50,142 +51,175 @@ npm install
    - Copy `.env.example` to `.env` in the root directory
    - Copy `apps/backend/.env.example` to `apps/backend/.env`
    - Copy `apps/mobile/.env.example` to `apps/mobile/.env`
-   - Fill in the required values
 
-### Running the Application
+### Running the Project
 
 #### Backend
-
-1. Start backend services (MongoDB, Redis):
-```bash
-npm run docker:up
-```
-
-2. Start the backend development server:
 ```bash
 cd apps/backend
 npm run dev
 ```
 
-The backend API will be available at `http://localhost:3000`
-
-#### Mobile
-
-1. Start the Metro bundler:
+#### Mobile (iOS)
 ```bash
 cd apps/mobile
-npm start
-```
-
-2. Run on iOS:
-```bash
 npm run ios
 ```
 
-3. Run on Android:
+#### Mobile (Android)
 ```bash
+cd apps/mobile
 npm run android
 ```
 
-## 🛠️ Tech Stack
+## 📱 Mobile App Features
+
+### Authentication Flow
+- Firebase Authentication
+- Email/Password signup
+- Social login support
+- Onboarding screens with swipe navigation
+
+### User Experience
+- **Swipeable Onboarding**: Users can swipe left/right through 3 onboarding slides with animated transitions
+- **Custom App Logo**: App icon generated from EasyAppIcon with support for multiple resolutions
+- **Real-time Chat**: Socket.IO integration for instant messaging
+- **Location Services**: Map-based discovery of nearby pets and events
+- **Push Notifications**: Firebase Cloud Messaging (FCM) for real-time alerts
+
+### Navigation Structure
+- Auth Stack (Authentication, Onboarding, Registration)
+- Main Stack (Feed, Communities, Chat, Explore, Profile)
+- Tab-based navigation for main features
+
+## 🔧 Backend Architecture
+
+### API Endpoints
+- `/api/auth` - Authentication
+- `/api/users` - User management
+- `/api/pets` - Pet profiles
+- `/api/posts` - Social feed
+- `/api/chat` - Messaging
+- `/api/communities` - Community management
+- `/api/events` - Event management
+- `/api/explore` - Discovery features
+- `/api/ai` - AI services
+
+### Services
+- **AI Services**: Pet assistant, recommendations, caption generation, smart search
+- **Auth Service**: Firebase integration, JWT tokens
+- **Cache Service**: Redis caching layer
+- **Chat Service**: Real-time messaging
+- **Notification Service**: Push notifications via FCM
+- **Event Service**: Event management and RSVPs
+
+### Database
+- MongoDB for primary data storage
+- Redis for caching and sessions
+- Firebase for authentication
+
+### Real-time Features
+- Socket.IO for chat, notifications, and presence updates
+- Handlers for chat, community, notifications, and user presence
+
+## 📦 Tech Stack
+
+### Frontend (Mobile)
+- React Native with TypeScript
+- React Navigation
+- Reanimated (animations)
+- Redux for state management
+- React Query for data fetching
 
 ### Backend
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Database**: MongoDB with Mongoose
-- **Cache**: Redis
-- **Real-time**: Socket.IO
-- **Authentication**: Firebase Auth, JWT
-- **File Storage**: Cloudinary
-- **AI**: Groq SDK for AI features
+- Node.js / Express
+- TypeScript
+- MongoDB
+- Redis
+- Socket.IO
+- Firebase (Auth, Cloud Messaging)
+
+### Hosting & Services
+- Docker & Docker Compose for containerization
+- Cloudinary for image management
+- Google Maps API
+- Google Places API
+
+## 🎨 App Icons
+
+Custom app logos have been integrated from EasyAppIcon:
+- Android: Multiple density support (ldpi, mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi)
+- iOS: All required sizes via AppIcon.appiconset
+
+Located in: `apps/mobile/android/app/src/main/res/` and `apps/mobile/ios/myapp/Images.xcassets/`
+
+## 🔌 Environment Variables
+
+### Backend
+```
+MONGODB_URI=mongodb://...
+REDIS_URL=redis://...
+FIREBASE_SERVICE_ACCOUNT_KEY=...
+CLOUDINARY_API_KEY=...
+GOOGLE_MAPS_API_KEY=...
+```
 
 ### Mobile
-- **Framework**: React Native 0.73
-- **Navigation**: React Navigation
-- **State Management**: Zustand
-- **Data Fetching**: TanStack Query (React Query)
-- **Forms**: React Hook Form with Yup validation
-- **Maps**: React Native Maps with clustering
-- **Real-time**: Socket.IO Client
-- **Authentication**: Firebase Auth
-- **UI Components**: Custom components with Reanimated
+```
+FIREBASE_PROJECT_ID=...
+GOOGLE_MAPS_API_KEY=...
+API_URL=http://...
+```
 
-## 📦 Available Scripts
+## 📝 Scripts
 
-### Root Level
-- `npm run dev` - Run all apps in development mode (parallel)
-- `npm run build` - Build all apps
-- `npm run lint` - Lint all apps
-- `npm run type-check` - Type check all apps
-- `npm run docker:up` - Start Docker services
-- `npm run docker:down` - Stop Docker services
-- `npm run docker:logs` - View Docker logs
+### Development
+```bash
+npm run dev        # Start development servers
+npm run build      # Build for production
+npm run lint       # Run ESLint
+npm run format     # Format code with Prettier
+```
 
-### Backend (`apps/backend`)
-- `npm run dev` - Start development server with nodemon
-- `npm run build` - Build TypeScript to JavaScript
-- `npm run start` - Start production server
-- `npm run lint` - Lint backend code
-- `npm run type-check` - Type check without emitting
+### Mobile
+```bash
+npm run ios        # Run on iOS simulator
+npm run android    # Run on Android emulator
+npm run mobile     # Run mobile app
+```
 
-### Mobile (`apps/mobile`)
-- `npm start` - Start Metro bundler
-- `npm run android` - Run on Android
-- `npm run ios` - Run on iOS
-- `npm run lint` - Lint mobile code
-- `npm run type-check` - Type check without emitting
+### Testing
+```bash
+npm run test       # Run tests
+npm run test:watch # Run tests in watch mode
+```
 
-## 🔧 Configuration
+## 🐛 Troubleshooting
 
-### Backend Environment Variables
+### Common Issues
 
-Key environment variables needed in `apps/backend/.env`:
-- `MONGODB_URI` - MongoDB connection string
-- `REDIS_URL` - Redis connection URL
-- `JWT_SECRET` - Secret for JWT tokens
-- `FIREBASE_*` - Firebase Admin SDK credentials
-- `CLOUDINARY_*` - Cloudinary credentials for image uploads
-- `GROQ_API_KEY` - Groq API key for AI features
-- `GOOGLE_MAPS_API_KEY` - Google Maps API key
+**Maps not working on Android:**
+- Ensure Google Maps API key is configured in `AndroidManifest.xml`
+- Rebuild the app: `npm run android`
 
-### Mobile Environment Variables
+**Build errors:**
+- Clear cache: `npm run clean` or `npm run clean-and-rebuild`
+- Rebuild: `npm run android` or `npm run ios`
 
-Key environment variables needed in `apps/mobile/.env`:
-- `API_URL` - Backend API URL
-- `GOOGLE_MAPS_API_KEY` - Google Maps API key (Android)
-- Firebase configuration values
-
-## 🏛️ Architecture
-
-### Backend Architecture
-- **Controllers** - Handle HTTP requests and responses
-- **Services** - Business logic layer
-- **Repositories** - Data access layer
-- **Models** - Mongoose schemas
-- **Middleware** - Authentication, validation, error handling
-- **Socket** - Real-time event handlers
-- **Routes** - API endpoint definitions
-
-### Mobile Architecture
-- **Screens** - Main UI screens
-- **Components** - Reusable UI components
-- **Services** - API calls and external services
-- **Hooks** - Custom React hooks
-- **Store** - Zustand stores for global state
-- **Navigation** - Navigation configuration
-- **Utils** - Utility functions
+**Firebase issues:**
+- Verify Firebase configuration in `.env`
+- Check Firebase project settings in Console
 
 ## 🤝 Contributing
 
-1. Create a feature branch from `main`
+1. Create a feature branch
 2. Make your changes
-3. Run linting and type checking
-4. Submit a pull request
+3. Submit a pull request
 
 ## 📄 License
 
-[Add your license here]
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## 📞 Support
 
-Built with modern web and mobile technologies for connecting pet owners worldwide.
+For issues and questions, please open an issue on GitHub or contact the development team.

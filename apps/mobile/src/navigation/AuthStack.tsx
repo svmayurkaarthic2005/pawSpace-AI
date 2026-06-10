@@ -4,9 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList, RootStackParamList } from '../types';
 import { useUser } from '../store/authStore';
 import SplashScreen from '../screens/SplashScreen';
-import OnboardingWelcome from '../screens/onboarding/OnboardingWelcome';
-import OnboardingProfile from '../screens/onboarding/OnboardingProfile';
-import OnboardingDiscover from '../screens/onboarding/OnboardingDiscover';
+import SwipeableOnboarding from '../screens/onboarding/SwipeableOnboarding';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AddPetScreen from '../screens/auth/AddPetScreen';
@@ -20,7 +18,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
  * AuthStack
  *
  * Handles the full pre-authentication flow:
- *   Splash → OnboardingWelcome → OnboardingProfile → OnboardingDiscover → Login
+ *   Splash → SwipeableOnboarding (3 slides) → Login
  *
  * Receives `skipOnboarding` via route.params from RootNavigator.
  * When true, initialRouteName is set to "Login" so onboarding is bypassed.
@@ -53,9 +51,7 @@ const AuthStack: React.FC<Props> = ({ route }) => {
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
-      <Stack.Screen name="OnboardingWelcome" component={OnboardingWelcome} />
-      <Stack.Screen name="OnboardingProfile" component={OnboardingProfile} />
-      <Stack.Screen name="OnboardingDiscover" component={OnboardingDiscover} />
+      <Stack.Screen name="OnboardingWelcome" component={SwipeableOnboarding} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="AddPet" component={AddPetScreen} />

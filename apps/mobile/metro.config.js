@@ -21,6 +21,20 @@ const config = {
     extraNodeModules: {
       events: path.resolve(projectRoot, 'node_modules/events'),
     },
+    blockList: [
+      // Ignore Android build directories
+      /.*\/android\/build\/.*/,
+      /.*\/android\/app\/build\/.*/,
+      // Ignore iOS build directories
+      /.*\/ios\/build\/.*/,
+      /.*\/ios\/Pods\/.*/,
+    ],
+  },
+  watcher: {
+    // Don't watch build directories
+    watchman: {
+      deferStates: ['hg.update'],
+    },
   },
 };
 

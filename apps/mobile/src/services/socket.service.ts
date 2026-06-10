@@ -2,7 +2,7 @@
 import '../utils/polyfills';
 import { io, Socket } from 'socket.io-client';
 import * as Keychain from 'react-native-keychain';
-import { STORAGE_KEYS } from '../constants';
+import { STORAGE_KEYS, SOCKET_BASE_URL } from '../constants';
 
 // ─── Event type definitions ───────────────────────────────────────────────────
 
@@ -88,10 +88,6 @@ interface ClientToServerEvents {
 
 // ─── SocketService singleton ──────────────────────────────────────────────────
 
-// Note: Android emulator cannot access localhost on host machine
-// Use 10.0.2.2 instead (special IP for Android emulator to reach host)
-const BASE_URL = __DEV__ ? 'http://10.0.2.2:5000' : 'https://api.pawspace.app';
-
 class SocketService {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
   private connectionState: ConnectionState = 'disconnected';
@@ -117,11 +113,11 @@ class SocketService {
       return;
     }
 
-    console.log('[Socket] Attempting to connect to:', BASE_URL, {
+    console.log('[Socket] Attempting to connect to:', SOCKET_BASE_URL, {
       tokenPreview: token.substring(0, 20) + '...',
     });
 
-    this.socket = io(BASE_URL, {
+    this.socket = io(SOCKET_BASE_URL, {
       auth: { token },
       transports: ['websocket', 'polling'], // Support both transports
       reconnection: true,

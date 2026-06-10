@@ -83,6 +83,8 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
   onZoomIn,
   onZoomOut,
 }) => {
+  const zoomingRef = useRef(false); // Prevent concurrent zoom operations
+
   // Show error fallback if maps module failed to load
   if (mapModuleError || !MapView) {
     return <MapErrorFallback error={mapModuleError || new Error('MapView not available')} />;
@@ -98,27 +100,67 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
     : DEFAULT_REGION;
 
   const handleZoomIn = () => {
-    if (mapRef.current && onZoomIn) {
-      mapRef.current.getCamera().then((camera: any) => {
-        mapRef.current.animateCamera({
+    if (!mapRef.current || !onZoomIn || zoomingRef.current) {
+      return; // Prevent concurrent zoom operations
+    }
+    
+    zoomingRef.current = true;
+    
+    mapRef.current.getCamera().then((camera: any) => {
+      if (!mapRef.current) {
+        zoomingRef.current = false;
+        return;
+      }
+      
+      mapRef.current.animateCamera(
+        {
           center: camera.center,
           zoom: (camera.zoom || 13) + 1,
-        }, { duration: 300 });
-      });
-      onZoomIn();
-    }
+        },
+        { duration: 300 }
+      );
+      
+      // Reset flag after animation completes
+      setTimeout(() => {
+        zoomingRef.current = false;
+        onZoomIn();
+      }, 300);
+    }).catch((err) => {
+      zoomingRef.current = false;
+      console.warn('Zoom in error:', err);
+    });
   };
 
   const handleZoomOut = () => {
-    if (mapRef.current && onZoomOut) {
-      mapRef.current.getCamera().then((camera: any) => {
-        mapRef.current.animateCamera({
+    if (!mapRef.current || !onZoomOut || zoomingRef.current) {
+      return; // Prevent concurrent zoom operations
+    }
+    
+    zoomingRef.current = true;
+    
+    mapRef.current.getCamera().then((camera: any) => {
+      if (!mapRef.current) {
+        zoomingRef.current = false;
+        return;
+      }
+      
+      mapRef.current.animateCamera(
+        {
           center: camera.center,
           zoom: (camera.zoom || 13) - 1,
-        }, { duration: 300 });
-      });
-      onZoomOut();
-    }
+        },
+        { duration: 300 }
+      );
+      
+      // Reset flag after animation completes
+      setTimeout(() => {
+        zoomingRef.current = false;
+        onZoomOut();
+      }, 300);
+    }).catch((err) => {
+      zoomingRef.current = false;
+      console.warn('Zoom out error:', err);
+    });
   };
 
   return (

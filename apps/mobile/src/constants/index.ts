@@ -5,11 +5,9 @@ export const APP_VERSION = '1.0.0';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
-// Note: Android emulator cannot access localhost on host machine
-// Use 10.0.2.2 instead (special IP for Android emulator to reach host)
-export const API_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:5000/api/v1'
-  : 'https://api.pawspace.app/api/v1';
+// API configuration is now in src/config/api.ts
+// This supports both emulators and physical devices
+export { API_BASE_URL, SOCKET_BASE_URL } from '../config/api';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 

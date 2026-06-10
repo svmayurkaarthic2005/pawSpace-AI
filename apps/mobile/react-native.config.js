@@ -1,18 +1,18 @@
 /**
- * React Native Configuration for Monorepo
- * 
- * This file explicitly tells React Native CLI where to find native modules
- * when running in a monorepo structure. Without this, autolinking fails.
+ * React Native configuration for monorepo autolinking
+ * This ensures react-native-maps and other native modules are properly linked
  */
+const path = require('path');
 
 module.exports = {
   project: {
-    ios: {},
     android: {},
+    ios: {},
   },
   dependencies: {
-    // Let React Native CLI handle autolinking for maps modules
-    // Custom paths removed as they cause validation errors
+    'react-native-maps': {
+      // Point to the root node_modules where react-native-maps is actually located
+      root: path.resolve(__dirname, '../../node_modules/react-native-maps'),
+    },
   },
-  assets: ['./src/assets/fonts/'],
 };

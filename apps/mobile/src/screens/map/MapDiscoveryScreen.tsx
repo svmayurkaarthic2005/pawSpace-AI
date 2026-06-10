@@ -70,40 +70,28 @@ const MapDiscoveryScreen: React.FC = () => {
   useEffect(() => {
     isMountedRef.current = true;
     
-    if (location.granted && !watchIdRef.current) {
-      console.log('🎯 Starting location watch...');
-      watchIdRef.current = location.startWatching();
+    // Only start watch if granted and not already watching
+    if (location.granted && watchIdRef.current === null) {
+      console.log('🎯 MapDiscoveryScreen: Starting location watch...');
+      const watchId = location.startWatching();
+      watchIdRef.current = watchId;
+      console.log('🎯 MapDiscoveryScreen: Watch ID stored:', watchId);
     }
     
     return () => {
       isMountedRef.current = false;
       
-      // Properly cleanup watch
+      // Cleanup watch on unmount
       if (watchIdRef.current !== null) {
-        console.log('🛑 Clearing location watch:', watchIdRef.current);
+        console.log('🛑 MapDiscoveryScreen: Clearing location watch:', watchIdRef.current);
         Geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
     };
-  }, [location.granted, location.startWatching]);
+  }, [location.granted]); // Only depend on granted status
 
-  // Periodically refresh location if not moving
-  useEffect(() => {
-    if (!location.granted) return;
-    
-    locationIntervalRef.current = setInterval(() => {
-      if (isMountedRef.current) {
-        location.getCurrentLocation();
-      }
-    }, 30000); // Refresh every 30 seconds
-
-    return () => {
-      if (locationIntervalRef.current) {
-        clearInterval(locationIntervalRef.current);
-        locationIntervalRef.current = null;
-      }
-    };
-  }, [location.granted, location.getCurrentLocation]);
+  // NOTE: Removed periodic location refresh interval - the watch already handles location updates
+  // The watch updates location when user moves 50m or every 15s, which is sufficient
 
   // Fetch nearby events
   const { data: eventsData, isLoading: isLoadingEvents } = useQuery({
@@ -179,12 +167,16 @@ const MapDiscoveryScreen: React.FC = () => {
     searchDebounceRef.current = setTimeout(async () => {
       if (!isMountedRef.current) return;
       
+      // Capture current location values to avoid using stale closure values
+      const currentLat = location.coords?.latitude;
+      const currentLng = location.coords?.longitude;
+      
       try {
         const res = await api.get('/map/geocode', {
           params: {
             q: text,
-            lat: location.coords?.latitude,
-            lng: location.coords?.longitude,
+            lat: currentLat,
+            lng: currentLng,
           },
         });
         
@@ -195,7 +187,7 @@ const MapDiscoveryScreen: React.FC = () => {
         console.error('Geocode search error:', error);
       }
     }, 400);
-  }, [location.coords?.latitude, location.coords?.longitude]);
+  }, []); // Remove location deps - use current values from closure at execution time
 
   // Cleanup search debounce on unmount
   useEffect(() => {

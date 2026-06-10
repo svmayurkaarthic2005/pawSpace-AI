@@ -15,6 +15,10 @@ type LocationState = {
 const PERMISSION =
   Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
 
+// GLOBAL singleton to prevent multiple watches
+let globalWatchId: number | null = null;
+let watchCount = 0;
+
 const useLocation = () => {
   const [locationState, setLocationState] = useState<LocationState>({
     granted: false,
@@ -25,6 +29,7 @@ const useLocation = () => {
   });
 
   const isMountedRef = useRef(true);
+  const locationFetchingRef = useRef(false); // Prevent concurrent location fetches
 
   const requestPermission = useCallback(async () => {
     const result = await request(PERMISSION);
@@ -41,8 +46,17 @@ const useLocation = () => {
   }, []);
 
   const getCurrentLocation = useCallback(() => {
+    // Prevent concurrent location fetches to avoid race conditions
+    if (locationFetchingRef.current) {
+      console.log('📍 Location fetch already in progress, skipping...');
+      return;
+    }
+    
+    locationFetchingRef.current = true;
+    
     Geolocation.getCurrentPosition(
       (pos) => {
+        locationFetchingRef.current = false;
         if (!isMountedRef.current) return;
         
         const { latitude, longitude, accuracy } = pos.coords;
@@ -56,19 +70,25 @@ const useLocation = () => {
       },
       (error) => {
         console.warn('Location error:', error.code, error.message);
-        // Retry with lower accuracy if high accuracy fails
+        // Retry with lower accuracy if high accuracy fails (timeout or position unavailable)
         if (error.code === 2 || error.code === 3) {
           Geolocation.getCurrentPosition(
             (pos) => {
+              locationFetchingRef.current = false;
               if (!isMountedRef.current) return;
               
               const { latitude, longitude, accuracy } = pos.coords;
               console.log('📍 Location acquired (fallback):', { latitude, longitude, accuracy });
               setLocationState((s) => ({ ...s, coords: { latitude, longitude }, accuracy, granted: true }));
             },
-            (retryError) => console.warn('Location retry error:', retryError),
+            (retryError) => {
+              locationFetchingRef.current = false;
+              console.warn('Location retry error:', retryError);
+            },
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
           );
+        } else {
+          locationFetchingRef.current = false;
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
@@ -92,22 +112,54 @@ const useLocation = () => {
   }, [getCurrentLocation, requestPermission]);
 
   const startWatching = useCallback(() => {
+    // CRITICAL: Prevent multiple watches from being created
+    if (globalWatchId !== null) {
+      console.log('⚠️  Watch already exists (ID:', globalWatchId, '), reusing it');
+      return globalWatchId;
+    }
+    
+    watchCount++;
+    console.log('📍 Starting NEW location watch #' + watchCount);
+    
     const watchId = Geolocation.watchPosition(
       (pos) => {
         if (!isMountedRef.current) return;
         
-        const { latitude, longitude } = pos.coords;
-        console.log('📍 Location updated:', { latitude, longitude });
-        setLocationState((s) => ({ ...s, coords: { latitude, longitude } }));
+        // Debounce rapid updates - only update if location changed significantly
+        const { latitude, longitude, accuracy } = pos.coords;
         
-        // Update server in background
-        api
-          .post('/map/location', { lat: latitude, lng: longitude, accuracy: pos.coords.accuracy })
-          .catch((err) => console.warn('Failed to update server location:', err));
+        setLocationState((prevState) => {
+          const prevCoords = prevState.coords;
+          
+          // Skip update if location hasn't changed (prevents duplicate API calls)
+          if (prevCoords && 
+              Math.abs(prevCoords.latitude - latitude) < 0.0001 &&
+              Math.abs(prevCoords.longitude - longitude) < 0.0001) {
+            console.log('📍 Location unchanged, skipping update');
+            return prevState;
+          }
+          
+          console.log('📍 Location watch updated:', { latitude, longitude, accuracy });
+          
+          // Update server in background (non-blocking)
+          api
+            .post('/map/location', { lat: latitude, lng: longitude, accuracy })
+            .catch((err) => console.warn('Failed to update server location:', err));
+          
+          return { ...prevState, coords: { latitude, longitude }, accuracy };
+        });
       },
       (error) => console.warn('Location watch error:', error.code, error.message),
-      { enableHighAccuracy: true, distanceFilter: 50, interval: 15000, fastestInterval: 10000 }
+      { 
+        enableHighAccuracy: true, 
+        distanceFilter: 50, // Only update if moved 50m
+        interval: 15000, // Check every 15s
+        fastestInterval: 10000 // Don't check faster than 10s
+      }
     );
+    
+    globalWatchId = watchId;
+    console.log('✅ Watch started with GLOBAL ID:', globalWatchId);
     return watchId;
   }, []);
 
@@ -116,20 +168,11 @@ const useLocation = () => {
     
     // Check permission on mount
     checkPermission();
-    
-    // Force location refresh after delay if granted but no coords
-    const timer = setTimeout(() => {
-      if (isMountedRef.current && locationState.granted && !locationState.coords) {
-        console.log('🔄 Forcing initial location fetch...');
-        getCurrentLocation();
-      }
-    }, 1000);
 
     return () => {
       isMountedRef.current = false;
-      clearTimeout(timer);
     };
-  }, [checkPermission, getCurrentLocation, locationState.granted, locationState.coords]);
+  }, []); // Run only once on mount
 
   return { ...locationState, requestPermission, checkPermission, getCurrentLocation, startWatching };
 };

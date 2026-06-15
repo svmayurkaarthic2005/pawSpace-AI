@@ -131,3 +131,6 @@ export const eventApi = {
     return data.data;
   },
 };
+
+// Export as eventService for consistency
+export const eventService = eventApi;

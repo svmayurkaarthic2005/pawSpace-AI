@@ -128,28 +128,36 @@ export const ResultsTabs: React.FC<ResultsTabsProps> = ({
 
       case 'posts':
         return results.posts.length > 0 ? (
-          <PostGrid posts={results.posts} />
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.allContent}>
+            <PostGrid posts={results.posts} />
+          </ScrollView>
         ) : (
           <EmptySearchState suggestion="Try a different search" />
         );
 
       case 'events':
         return results.events.length > 0 ? (
-          <EventsList events={results.events} />
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.allContent}>
+            <EventsList events={results.events} />
+          </ScrollView>
         ) : (
           <EmptySearchState suggestion="No events found. Try searching for communities instead" />
         );
 
       case 'communities':
         return results.communities.length > 0 ? (
-          <CommunitiesList communities={results.communities} />
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.allContent}>
+            <CommunitiesList communities={results.communities} />
+          </ScrollView>
         ) : (
           <EmptySearchState suggestion="No communities found. Browse trending communities" />
         );
 
       case 'people':
         return results.users.length > 0 ? (
-          <UsersList users={results.users} />
+          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.allContent}>
+            <UsersList users={results.users} />
+          </ScrollView>
         ) : (
           <EmptySearchState suggestion="No people found. Try searching nearby" />
         );
@@ -162,11 +170,13 @@ export const ResultsTabs: React.FC<ResultsTabsProps> = ({
   return (
     <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
       {/* Tabs Header */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsContainer}
-      >
+      <View style={styles.tabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsContainer}
+          style={styles.tabsScroll}
+        >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -188,7 +198,8 @@ export const ResultsTabs: React.FC<ResultsTabsProps> = ({
             )}
           </TouchableOpacity>
         ))}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Content */}
       <View style={styles.content}>{renderContent()}</View>
@@ -200,21 +211,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  tabsWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  tabsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: 60,
+  },
   tabsContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    marginRight: 8,
   },
   tabActive: {
     backgroundColor: '#7C3AED',

@@ -35,7 +35,7 @@ const ParsedCaption: React.FC<ParsedCaptionProps> = ({ text }) => {
             <Text
               key={index}
               style={styles.mention}
-              onPress={() => navigation.navigate('Profile', { username: word.slice(1) })}
+              onPress={() => navigation.push('Profile', { username: word.slice(1) })}
             >
               {word}
             </Text>

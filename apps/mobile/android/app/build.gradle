@@ -52,6 +52,11 @@ react {
  */
 def enableProguardInReleaseBuilds = false
 
+// Ensure react-native-screens can find react-native in monorepo
+project.ext.react = [
+    REACT_NATIVE_NODE_MODULES_DIR: file("../../../../node_modules")
+]
+
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *

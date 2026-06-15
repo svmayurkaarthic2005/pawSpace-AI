@@ -83,19 +83,19 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.communityInfo}>
         <Text style={[styles.communityName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
         <View style={styles.tagsRow}>
-          {item.species.slice(0, 2).map((s) => (
+          {(item.species ?? []).slice(0, 2).map((s) => (
             <View key={s} style={[styles.speciesTag, { backgroundColor: colors.primarySurface }]}>
               <Text style={[styles.speciesTagText, { color: colors.primary }]}>{s}</Text>
             </View>
           ))}
-          {item.tags.slice(0, 1).map((t) => (
+          {(item.tags ?? []).slice(0, 1).map((t) => (
             <View key={t} style={[styles.speciesTag, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
               <Text style={[styles.speciesTagText, { color: subColor }]}>{t}</Text>
             </View>
           ))}
         </View>
         <Text style={[styles.communityMeta, { color: subColor }]}>
-          {formatCount(item.memberCount)} members · New post {item.lastPost ? '2h ago' : 'recently'}
+          {formatCount(item.memberCount ?? 0)} members · New post {item.lastPost ? '2h ago' : 'recently'}
         </Text>
       </View>
       {item.isMember ? (
@@ -120,7 +120,7 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
       <Text style={[styles.discoverName, { color: textColor }]} numberOfLines={2}>{item.name}</Text>
-      <Text style={[styles.discoverMeta, { color: subColor }]}>{formatCount(item.memberCount)} members</Text>
+      <Text style={[styles.discoverMeta, { color: subColor }]}>{formatCount(item.memberCount ?? 0)} members</Text>
       <TouchableOpacity
         style={[styles.joinBtn, { backgroundColor: colors.primary }]}
         onPress={() => joinMutation.mutate(item._id)}

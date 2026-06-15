@@ -1,0 +1,59 @@
+diff --git a/node_modules/react-native-screens/lib/commonjs/index.js b/node_modules/react-native-screens/lib/commonjs/index.js
+index abc1234..def5678 100644
+--- a/node_modules/react-native-screens/lib/commonjs/index.js
++++ b/node_modules/react-native-screens/lib/commonjs/index.js
+@@ -240,4 +240,28 @@ var _utils = require("./utils");
+ var _useTransitionProgress = _interopRequireDefault(require("./useTransitionProgress"));
+ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+ function _getRequireWildcardCache(e) { if ("function" != typeof WeakMap) return null; var r = new WeakMap(), t = new WeakMap(); return (_getRequireWildcardCache = function (e) { return e ? t : r; })(e); }
+ function _interopRequireWildcard(e, r) { if (!r && e && e.__esModule) return e; if (null === e || "object" != typeof e && "function" != typeof e) return { default: e }; var t = _getRequireWildcardCache(r); if (t && t.has(e)) return t.get(e); var n = { __proto__: null }, a = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var u in e) if ("default" !== u && Object.prototype.hasOwnProperty.call(e, u)) { var i = a ? Object.getOwnPropertyDescriptor(e, u) : null; i && (i.get || i.set) ? Object.defineProperty(n, u, i) : n[u] = e[u]; } return n.default = e, t && t.set(e, n), n; }
+-//# sourceMappingURL=index.js.map
++
++// ─── Compatibility shims for @react-navigation/native-stack@7.x ───────────────
++// @react-navigation/native-stack >= 7.0.0 requires react-native-screens >= 4.0.0.
++// This project uses react-native-screens@3.30.1 (required by react-native@0.73.2).
++// These two exports were added in v4; we shim them here so v3 stays compatible.
++
++// compatibilityFlags: v4 uses this to gate the new Android header-height
++// implementation. An empty object means all flags default to false/off,
++// which is the correct behavior for v3.
++Object.defineProperty(exports, "compatibilityFlags", {
++  enumerable: true,
++  get: function () {
++    return {};
++  }
++});
++
++// ScreenStackItem: v4 renamed the Screen component (when used inside ScreenStack)
++// to ScreenStackItem. Aliasing it to Screen makes the native stack render correctly.
++Object.defineProperty(exports, "ScreenStackItem", {
++  enumerable: true,
++  get: function () {
++    return _Screen.default;
++  }
++});
++//# sourceMappingURL=index.js.map
+diff --git a/node_modules/react-native-screens/lib/module/index.js b/node_modules/react-native-screens/lib/module/index.js
+index abc1234..def5678 100644
+--- a/node_modules/react-native-screens/lib/module/index.js
++++ b/node_modules/react-native-screens/lib/module/index.js
+@@ -34,4 +34,7 @@ export { isSearchBarAvailableForCurrentPlatform, isNewBackTitleImplementation, e
+  * Hooks
+  */
+ export { default as useTransitionProgress } from './useTransitionProgress';
+-//# sourceMappingURL=index.js.map
++
++export const compatibilityFlags = {};
++export { default as ScreenStackItem } from './components/Screen';
++//# sourceMappingURL=index.js.map
+diff --git a/node_modules/react-native-screens/src/index.tsx b/node_modules/react-native-screens/src/index.tsx
+index abc1234..def5678 100644
+--- a/node_modules/react-native-screens/src/index.tsx
++++ b/node_modules/react-native-screens/src/index.tsx
+@@ -70,4 +70,7 @@ export {
+  * Hooks
+  */
+ export { default as useTransitionProgress } from './useTransitionProgress';
++
++export const compatibilityFlags = {};
++export { default as ScreenStackItem } from './components/Screen';

@@ -4,11 +4,8 @@ const ONBOARDING_KEY = 'pawspace_onboarding_complete';
 
 /**
  * Returns true if the user has already completed onboarding.
- * In __DEV__ mode this always returns false so developers can test
- * the full onboarding flow on every launch without clearing app data.
  */
 export const hasCompletedOnboarding = async (): Promise<boolean> => {
-  if (__DEV__) return false;   // ← always show onboarding in dev
   try {
     const value = await AsyncStorage.getItem(ONBOARDING_KEY);
     return value === 'true';

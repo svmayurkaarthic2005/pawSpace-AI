@@ -12,7 +12,7 @@ type RouteParams = {
 export const EditCommunityScreen: React.FC = () => {
   const route = useRoute<RouteProp<RouteParams, 'EditCommunity'>>();
   const navigation = useNavigation();
-  const { communityId } = route.params;
+  const { communityId } = (route.params ?? {}) as any;
 
   return (
     <SafeAreaView style={styles.container}>

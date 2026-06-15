@@ -119,7 +119,7 @@ class SocketService {
 
     this.socket = io(SOCKET_BASE_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'], // Support both transports
+      transports: ['websocket'], // Force websocket transport for React Native
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
@@ -206,17 +206,28 @@ class SocketService {
         attempt: this.reconnectAttempts + 1,
         maxAttempts: this.maxReconnectAttempts,
       });
-      this.reconnectAttempts++;
       
       // Check if it's an auth error (token expired/invalid)
       if (err.message.includes('Invalid or expired token') || 
           err.message.includes('Authentication') ||
           err.message.includes('jwt expired') ||
           err.message.includes('invalid token')) {
-        console.log('[Socket] Auth error detected, fetching fresh token and reconnecting...');
+        console.log('[Socket] Auth error detected, waiting before retry...');
+        
+        // Don't increment reconnect attempts for auth errors
+        // Just wait longer to give API time to refresh the token
+        this.setConnectionState('reconnecting');
+        
+        // Disconnect the socket to stop immediate retries
+        if (this.socket) {
+          this.socket.disconnect();
+        }
+        
+        // Wait 3 seconds to give the API interceptor time to refresh the token
+        await new Promise<void>(resolve => setTimeout(resolve, 3000));
         
         try {
-          // Get fresh token from keychain (may have been refreshed by API interceptor)
+          // Get token from keychain (should be refreshed by now)
           const credentials = await Keychain.getGenericPassword({
             service: STORAGE_KEYS.ACCESS_TOKEN,
           });
@@ -228,28 +239,24 @@ class SocketService {
             // Update socket auth with fresh token
             this.socket.auth = { token: freshToken };
             
-            // Disconnect and let it auto-reconnect with new token
-            this.socket.disconnect();
+            // Reconnect with new token
+            this.socket.connect();
             
-            // Reset reconnect attempts for fresh start
-            this.reconnectAttempts = 0;
-            
-            // Trigger reconnection
-            setTimeout(() => {
-              if (this.socket) {
-                this.socket.connect();
-              }
-            }, 1000);
-            
-            return; // Exit early, don't count this as a failed attempt
+            return; // Exit early
           } else {
-            console.error('[Socket] No fresh token available, cannot reconnect');
+            console.error('[Socket] No token available after waiting');
+            this.setConnectionState('disconnected');
           }
         } catch (tokenError) {
           console.error('[Socket] Failed to fetch fresh token:', tokenError);
+          this.setConnectionState('disconnected');
         }
+        
+        return; // Exit early for auth errors
       }
       
+      // For non-auth errors, count as regular retry
+      this.reconnectAttempts++;
       this.setConnectionState('reconnecting');
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {

@@ -5,6 +5,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { Notification, NotificationType } from '../../types';
 import { NotificationText } from './NotificationText';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
+import { followApi } from '../../services/post.service';
+import Toast from 'react-native-toast-message';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,8 @@ const NOTIFICATION_ICON_CONFIG: Record<NotificationType, IconConfig> = {
   like: { icon: 'heart', color: '#EF4444', bg: 'rgba(239,68,68,0.2)' },
   comment: { icon: 'message-circle', color: '#7C3AED', bg: 'rgba(124,58,237,0.2)' },
   follow: { icon: 'user-plus', color: '#1D9E75', bg: 'rgba(29,158,117,0.2)' },
+  follow_request: { icon: 'user-plus', color: '#F59E0B', bg: 'rgba(245,158,11,0.2)' },
+  follow_accept: { icon: 'user-check', color: '#10B981', bg: 'rgba(16,185,129,0.2)' },
   event_rsvp: { icon: 'calendar', color: '#EF9F27', bg: 'rgba(239,159,39,0.2)' },
   chat: { icon: 'message-square', color: '#7C3AED', bg: 'rgba(124,58,237,0.2)' },
   community_post: { icon: 'users', color: '#378ADD', bg: 'rgba(55,138,221,0.2)' },
@@ -35,6 +39,29 @@ const NOTIFICATION_ICON_CONFIG: Record<NotificationType, IconConfig> = {
 
 export const NotificationRow: React.FC<NotificationRowProps> = ({ notification, onPress }) => {
   const iconConfig = NOTIFICATION_ICON_CONFIG[notification.type] ?? NOTIFICATION_ICON_CONFIG.chat;
+  const [requestState, setRequestState] = React.useState<'pending' | 'accepted' | 'rejected'>('pending');
+
+  const handleAccept = async () => {
+    if (!notification.sender?._id) return;
+    try {
+      await followApi.acceptRequest(notification.sender._id);
+      setRequestState('accepted');
+      Toast.show({ type: 'success', text1: 'Request accepted' });
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Failed to accept request' });
+    }
+  };
+
+  const handleReject = async () => {
+    if (!notification.sender?._id) return;
+    try {
+      await followApi.rejectRequest(notification.sender._id);
+      setRequestState('rejected');
+      Toast.show({ type: 'success', text1: 'Request rejected' });
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Failed to reject request' });
+    }
+  };
 
   return (
     <TouchableOpacity
@@ -72,8 +99,25 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({ notification, 
         <Text style={styles.timeText}>{formatRelativeTime(notification.createdAt)}</Text>
       </View>
 
-      {/* Right: entity thumbnail OR spacing */}
-      {notification.entityImage ? (
+      {/* Right: entity thumbnail OR actions OR spacing */}
+      {notification.type === 'follow_request' ? (
+        <View style={styles.actionsContainer}>
+          {requestState === 'pending' ? (
+            <>
+              <TouchableOpacity style={[styles.actionButton, styles.acceptButton]} onPress={handleAccept}>
+                <Icon name="check" color="#10B981" size={16} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.rejectButton]} onPress={handleReject}>
+                <Icon name="x" color="#EF4444" size={16} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.actionHandledText}>
+              {requestState === 'accepted' ? 'Accepted' : 'Rejected'}
+            </Text>
+          )}
+        </View>
+      ) : notification.entityImage ? (
         <TouchableOpacity onPress={onPress}>
           <FastImage source={{ uri: notification.entityImage }} style={styles.entityThumbnail} />
         </TouchableOpacity>
@@ -143,5 +187,31 @@ const styles = StyleSheet.create({
   },
   rightSpace: {
     width: 44,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  acceptButton: {
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderColor: 'rgba(16,185,129,0.3)',
+  },
+  rejectButton: {
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.3)',
+  },
+  actionHandledText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Inter-Medium',
   },
 });

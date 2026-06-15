@@ -1,10 +1,12 @@
 import React, { useCallback } from 'react';
 import {
-  View, StyleSheet, ActivityIndicator, StatusBar, RefreshControl,
+  View, StyleSheet, ActivityIndicator, StatusBar, RefreshControl, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { postApi } from '../../services/post.service';
 import PostCard from '../../components/feed/PostCard';
 import FeedHeader from '../../components/feed/FeedHeader';
@@ -12,6 +14,8 @@ import EmptyFeed from '../../components/feed/EmptyFeed';
 import { QUERY_KEYS } from '../../constants';
 
 const FeedScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  
   const {
     data,
     fetchNextPage,
@@ -87,6 +91,15 @@ const FeedScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+      
+      {/* AI Pet Assistant FAB */}
+      <TouchableOpacity
+        style={styles.aiFab}
+        onPress={() => navigation.navigate('PetAssistant')}
+        activeOpacity={0.8}
+      >
+        <Icon name="sparkles" size={24} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -111,6 +124,22 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  aiFab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
 

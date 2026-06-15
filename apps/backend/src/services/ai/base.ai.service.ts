@@ -1,4 +1,4 @@
-import Groq from 'groq-sdk';
+import { GoogleGenAI } from '@google/genai';
 import crypto from 'crypto';
 import { env } from '../../config/env';
 import { redis } from '../../config/redis';
@@ -8,8 +8,8 @@ import { AppError } from '../../middleware/error';
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 export const AI_MODELS = {
-  FAST: 'llama3-8b-8192',
-  SMART: 'llama3-70b-8192',
+  FAST: 'gemini-2.5-flash',
+  SMART: 'gemini-2.5-flash',
 } as const;
 
 export type AIModel = (typeof AI_MODELS)[keyof typeof AI_MODELS];
@@ -54,12 +54,12 @@ const RL_WINDOW_SECS = 60;
 // ─── Base AI Service ──────────────────────────────────────────────────────────
 
 export abstract class BaseAIService {
-  protected readonly groq: Groq;
+  protected readonly ai: GoogleGenAI;
   protected abstract readonly feature: AIFeature;
   protected abstract readonly fallbackResponse: string;
 
   constructor() {
-    this.groq = new Groq({ apiKey: env.GROQ_API_KEY });
+    this.ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
   }
 
   // ── Rate limiting ──────────────────────────────────────────────────────────
@@ -176,18 +176,28 @@ export abstract class BaseAIService {
     const start = Date.now();
 
     try {
-      const completion = await this.groq.chat.completions.create({
+      const systemMessages = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+      const chatMessages = messages.filter(m => m.role !== 'system');
+      
+      const contents = chatMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : m.role,
+        parts: [{ text: m.content }]
+      }));
+
+      const response = await this.ai.models.generateContent({
         model,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        top_p: topP,
-        stream: false,
+        contents,
+        config: {
+          temperature,
+          maxOutputTokens: maxTokens,
+          topP,
+          systemInstruction: systemMessages ? { parts: [{ text: systemMessages }] } : undefined,
+        }
       });
 
       const latencyMs = Date.now() - start;
-      const text = completion.choices[0]?.message?.content ?? this.fallbackResponse;
-      const tokensUsed = completion.usage?.total_tokens ?? 0;
+      const text = response.text ?? this.fallbackResponse;
+      const tokensUsed = response.usageMetadata?.totalTokenCount ?? 0;
 
       // Cache successful response
       await this.setCached(promptHash, text);
@@ -204,7 +214,7 @@ export abstract class BaseAIService {
 
       return { text, tokensUsed, latencyMs, cached: false, modelName: model };
     } catch (err) {
-      console.error(`[AI:${this.feature}] Groq error:`, err);
+      console.error(`[AI:${this.feature}] Gemini API error:`, err);
       return {
         text: this.fallbackResponse,
         tokensUsed: 0,
@@ -227,17 +237,27 @@ export abstract class BaseAIService {
     const { model = AI_MODELS.SMART, temperature = 0.7, maxTokens = 1024 } = options;
 
     try {
-      const streamResponse = await this.groq.chat.completions.create({
+      const systemMessages = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+      const chatMessages = messages.filter(m => m.role !== 'system');
+      
+      const contents = chatMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : m.role,
+        parts: [{ text: m.content }]
+      }));
+
+      const streamResponse = await this.ai.models.generateContentStream({
         model,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        stream: true,
+        contents,
+        config: {
+          temperature,
+          maxOutputTokens: maxTokens,
+          systemInstruction: systemMessages ? { parts: [{ text: systemMessages }] } : undefined,
+        }
       });
 
       let fullText = '';
       for await (const chunk of streamResponse) {
-        const delta = chunk.choices[0]?.delta?.content ?? '';
+        const delta = chunk.text;
         if (delta) {
           fullText += delta;
           yield delta;

@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import FastImage from 'react-native-fast-image';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
-import { Community } from '../../types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Community, ExploreStackParamList } from '../../types';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { JoinButton } from '../ui/JoinButton';
 import { formatCount } from '../../utils/format';
@@ -17,13 +18,14 @@ const { width: screenWidth } = Dimensions.get('window');
 const COL_WIDTH = (screenWidth - 48) / 2;
 
 export const CommunityCard: React.FC<CommunityCardProps> = ({ community, showAIBadge }) => {
-  const navigation = useNavigation();
+  type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'CommunityDetail'>;
+  const navigation = useNavigation<NavigationProp>();
 
   const handlePress = () => {
-    navigation.navigate('CommunityDetail' as never, {
+    navigation.navigate('CommunityDetail', {
       communityId: community.id,
       community,
-    } as never);
+    });
   };
 
   const handleJoin = () => {
@@ -89,8 +91,8 @@ export const CommunityCard: React.FC<CommunityCardProps> = ({ community, showAIB
         </Text>
         <View style={styles.metaRow}>
           <Icon name="users" size={11} color="rgba(255, 255, 255, 0.35)" />
-          <Text style={styles.memberText}>{formatCount(community.memberCount)}</Text>
-          {community.species.slice(0, 1).map((s) => (
+          <Text style={styles.memberText}>{formatCount(community.memberCount ?? 0)}</Text>
+          {(community.species ?? []).slice(0, 1).map((s) => (
             <SpeciesBadge key={s} species={s} size="xs" />
           ))}
         </View>

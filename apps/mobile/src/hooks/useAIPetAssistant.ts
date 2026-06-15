@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import * as Keychain from 'react-native-keychain';
 import { useAuthStore } from '../store/authStore';
+import { STORAGE_KEYS } from '../constants';
 import {
   Message,
   PetProfile,
@@ -38,8 +40,33 @@ export const useAIPetAssistant = (initialPet?: PetProfile) => {
     if (!text.trim() || !selectedPet || !user) return;
     if (isStreaming) return;
 
-    const token = useAuthStore.getState().accessToken;
-    if (!token) return;
+    // Get token directly from Keychain (same as axios interceptor does)
+    let token: string | null = null;
+    try {
+      const credentials = await Keychain.getGenericPassword({
+        service: STORAGE_KEYS.ACCESS_TOKEN,
+      });
+      token = credentials ? credentials.password : null;
+    } catch (error) {
+      console.error('[AI Assistant] Failed to get token from Keychain:', error);
+    }
+
+    // Fallback to Zustand store
+    if (!token) {
+      token = useAuthStore.getState().accessToken;
+    }
+
+    if (!token) {
+      console.error('[AI Assistant] No access token available');
+      return;
+    }
+
+    console.log('[AI Assistant] Sending message:', { 
+      petName: selectedPet.name, 
+      messageLength: text.length,
+      hasToken: !!token,
+      tokenPreview: token.substring(0, 20) + '...'
+    });
 
     // Add user message
     const userMessage: Message = {
@@ -86,6 +113,11 @@ export const useAIPetAssistant = (initialPet?: PetProfile) => {
       message: text.trim(),
     };
 
+    console.log('[AI Assistant] Sending payload:', { 
+      petName: payload.pet.name, 
+      historyLength: payload.history.length 
+    });
+
     let fullResponse = '';
 
     xhrRef.current = streamAIChat(token, payload, {
@@ -100,6 +132,7 @@ export const useAIPetAssistant = (initialPet?: PetProfile) => {
         );
       },
       onSuggestions: (newSuggestions: string[]) => {
+        console.log('[AI Assistant] Received suggestions:', newSuggestions);
         setSuggestions(newSuggestions);
         setMessages(prev =>
           prev.map(msg =>
@@ -110,6 +143,7 @@ export const useAIPetAssistant = (initialPet?: PetProfile) => {
         );
       },
       onDone: () => {
+        console.log('[AI Assistant] Stream completed successfully');
         setMessages(prev =>
           prev.map(msg =>
             msg.id === aiMessageId
@@ -122,12 +156,13 @@ export const useAIPetAssistant = (initialPet?: PetProfile) => {
         xhrRef.current = null;
       },
       onError: (error: string) => {
+        console.error('[AI Assistant] Stream error:', error);
         setMessages(prev =>
           prev.map(msg =>
             msg.id === aiMessageId
               ? {
                   ...msg,
-                  content: fullResponse || error || 'An error occurred. Please try again.',
+                  content: fullResponse || error || 'Sorry, something went wrong. Please try again.',
                   isStreaming: false,
                 }
               : msg

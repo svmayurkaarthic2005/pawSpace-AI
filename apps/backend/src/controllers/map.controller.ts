@@ -6,6 +6,8 @@ import { Pet } from '../models/pet.model';
 import { Follow } from '../models/follow.model';
 import { getPlaceAutocomplete, getDirections } from '../utils/googleMaps.util';
 import { redis } from '../config/redis';
+import { Block } from '../models/block.model';
+import mongoose from 'mongoose';
 
 export const getNearbyEvents = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -24,6 +26,15 @@ export const getNearbyEvents = async (req: Request, res: Response): Promise<void
     const matchQuery: any = {
       status: 'upcoming',
     };
+
+    if (req.user?.userId) {
+      const blockedDocs = await Block.find({ blocker: req.user.userId }).distinct('blocked');
+      const blockedMeDocs = await Block.find({ blocked: req.user.userId }).distinct('blocker');
+      const allBlockedIds = [...blockedDocs, ...blockedMeDocs];
+      if (allBlockedIds.length > 0) {
+        matchQuery.creator = { $nin: allBlockedIds };
+      }
+    }
 
     // Species filter
     if (species && species !== '') {
@@ -146,6 +157,11 @@ export const getNearbyUsers = async (req: Request, res: Response): Promise<void>
     // Get users already following
     const following = await Follow.find({ follower: userId }).distinct('following');
 
+    // Get blocked users
+    const blockedDocs = await Block.find({ blocker: userId }).distinct('blocked');
+    const blockedMeDocs = await Block.find({ blocked: userId }).distinct('blocker');
+    const allBlockedIds = [...blockedDocs, ...blockedMeDocs].map(id => id.toString());
+
     // Geospatial aggregation on UserLocation
     const nearbyLocations = await UserLocation.aggregate([
       {
@@ -164,9 +180,12 @@ export const getNearbyUsers = async (req: Request, res: Response): Promise<void>
       },
     ]);
 
-    // Filter out self and already following
+    // Filter out self, already following, and blocked users
     const filteredLocations = nearbyLocations.filter(
-      (loc) => loc.user.toString() !== userId?.toString() && !following.some((fid) => fid.toString() === loc.user.toString())
+      (loc) => 
+        loc.user.toString() !== userId?.toString() && 
+        !following.some((fid) => fid.toString() === loc.user.toString()) &&
+        !allBlockedIds.includes(loc.user.toString())
     );
 
     // Populate user details and first pet
@@ -319,5 +338,31 @@ export const getDirectionsRoute = async (req: Request, res: Response): Promise<v
   } catch (error) {
     console.error('Get directions error:', error);
     res.status(500).json({ error: 'Failed to get directions' });
+  }
+};
+
+export const deleteUserLocation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    // Delete from DB
+    await UserLocation.findOneAndDelete({ user: userId });
+
+    // Delete from Redis
+    try {
+      await redis.del(`location:${userId}`);
+    } catch (redisError) {
+      console.error('Redis cache error:', redisError);
+    }
+
+    res.json({ ok: true, message: 'Location tracking disabled and location deleted.' });
+  } catch (error) {
+    console.error('Delete location error:', error);
+    res.status(500).json({ error: 'Failed to delete location' });
   }
 };

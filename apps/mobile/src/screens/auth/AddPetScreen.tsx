@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
   Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { launchImageLibrary } from 'react-native-image-picker';
+import FastImage from 'react-native-fast-image';
 import { AuthStackParamList } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/auth.service';
@@ -96,16 +98,60 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'AddPet'>;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { name, username, email, password } = route.params;
+  const { name, username, email, password } = (route.params ?? {}) as any;
   const loginAction = useAuthStore((s) => s.login);
 
   const [petName, setPetName] = useState('');
   const [species, setSpecies] = useState<Species>('Dog');
   const [breed, setBreed] = useState('');
   const [age, setAge] = useState(2);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Synchronous in-flight guard — prevents double-tap / duplicate API calls
+  // before React has a chance to re-render the disabled state.
+  const isRequestInFlight = useRef(false);
+
+  const handlePickPhoto = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'mixed',
+        quality: 0.8,
+        videoQuality: 'high',
+        selectionLimit: 1,
+      });
+
+      if (result.assets?.[0]) {
+        const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+
+        if (asset.uri) {
+          setPhotoUri(asset.uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking photo:', error);
+      Alert.alert('Error', 'Failed to pick photo');
+    }
+  };
+
   const registerAndProceed = async (skipPet = false) => {
+    // Synchronous guard: bail out immediately if a request is already in flight.
+    // This prevents duplicate calls from double-taps or pressing both buttons
+    // before React re-renders with `disabled={isSubmitting}`.
+    if (isRequestInFlight.current) return;
+    isRequestInFlight.current = true;
+
     setIsSubmitting(true);
     try {
       const result = await authApi.register({
@@ -119,11 +165,26 @@ const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
       });
       await loginAction(result.user, result.accessToken, result.refreshToken);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Registration failed. Please try again.';
-      Alert.alert('Registration Failed', message);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; code?: string } } };
+      const status = axiosErr?.response?.status;
+      const code = axiosErr?.response?.data?.code;
+
+      if (status === 409 || code === 'EMAIL_TAKEN') {
+        Alert.alert(
+          'Email Already Registered',
+          'An account with this email already exists. Please log in instead.',
+          [
+            { text: 'Go to Login', onPress: () => navigation.navigate('Login' as never) },
+            { text: 'OK', style: 'cancel' },
+          ]
+        );
+      } else {
+        const message =
+          axiosErr?.response?.data?.message ?? 'Registration failed. Please try again.';
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
+      isRequestInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -180,12 +241,22 @@ const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               style={styles.photoPicker}
               activeOpacity={0.75}
-              onPress={() => Alert.alert('Coming Soon', 'Photo upload will be available soon.')}
+              onPress={handlePickPhoto}
             >
-              <View style={styles.photoDashedCircle}>
-                <Text style={styles.photoIcon}>🐾</Text>
-              </View>
-              <Text style={styles.photoLabel}>Tap to add photo</Text>
+              {photoUri ? (
+                <FastImage
+                  source={{ uri: photoUri }}
+                  style={styles.photoDashedCircle}
+                  resizeMode={FastImage.resizeMode.cover}
+                />
+              ) : (
+                <View style={styles.photoDashedCircle}>
+                  <Text style={styles.photoIcon}>🐾</Text>
+                </View>
+              )}
+              <Text style={styles.photoLabel}>
+                {photoUri ? 'Change photo' : 'Tap to add photo'}
+              </Text>
             </TouchableOpacity>
 
             {/* Pet Name */}

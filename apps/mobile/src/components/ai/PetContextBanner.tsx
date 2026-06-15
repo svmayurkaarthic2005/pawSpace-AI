@@ -17,13 +17,13 @@ const PetContextBanner: React.FC<PetContextBannerProps> = ({ pet, onClose }) => 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <MaterialCommunityIcons name="paw" size={14} color="#A78BFA" />
+        <MaterialCommunityIcons name="paw" size={16} color="#C4B5FD" />
         <Text style={styles.text}>
           Chatting about: {petInfo.join(', ')}
         </Text>
       </View>
       <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-        <Icon name="close" size={16} color="#A78BFA" />
+        <Icon name="close" size={18} color="#C4B5FD" />
       </TouchableOpacity>
     </View>
   );
@@ -31,14 +31,14 @@ const PetContextBanner: React.FC<PetContextBannerProps> = ({ pet, onClose }) => 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(124,58,237,0.15)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(124,58,237,0.3)',
-    borderRadius: 12,
-    padding: 10,
-    paddingHorizontal: 14,
+    backgroundColor: 'rgba(124,58,237,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.4)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -46,17 +46,18 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
   },
   text: {
-    fontSize: 13,
-    color: '#A78BFA',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#C4B5FD',
+    fontWeight: '600',
     flex: 1,
   },
   closeBtn: {
     padding: 4,
+    marginLeft: 8,
   },
 });
 

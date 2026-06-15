@@ -26,7 +26,7 @@ const RSVP_OPTIONS = [
 const formatDistance = (m: number) => m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)} km`;
 
 const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { eventId } = route.params as { eventId: string };
+  const { eventId } = (route.params ?? {}) as { eventId: string };
   const isDark = useColorScheme() === 'dark';
   const { coords } = useLocation();
   const queryClient = useQueryClient();

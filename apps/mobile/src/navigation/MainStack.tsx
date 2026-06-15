@@ -21,10 +21,19 @@ import ExploreScreen from '../screens/explore/ExploreScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
+import PasswordSecurityScreen from '../screens/profile/PasswordSecurityScreen';
+import PrivacySettingsScreen from '../screens/profile/PrivacySettingsScreen';
+import LinkedAccountsScreen from '../screens/profile/LinkedAccountsScreen';
+import ThemeSettingsScreen from '../screens/profile/ThemeSettingsScreen';
+import LanguageSettingsScreen from '../screens/profile/LanguageSettingsScreen';
+import FollowersListScreen from '../screens/profile/FollowersListScreen';
+import BlockedUsersScreen from '../screens/profile/BlockedUsersScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import PetProfileScreen from '../screens/pet/PetProfileScreen';
 import AddPetScreen from '../screens/pet/AddPetScreen';
+import EditPetScreen from '../screens/pet/EditPetScreen';
 import EventDetailScreen from '../screens/events/EventDetailScreen';
+import CreateEventScreen from '../screens/events/CreateEventScreen';
 import MapDiscoveryScreen from '../screens/map/MapDiscoveryScreen';
 import ChatListScreen from '../screens/chat/ChatListScreen';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
@@ -51,7 +60,9 @@ const FeedNavigator = () => (
     <FeedStack.Screen name="FeedHome" component={FeedScreen} />
     <FeedStack.Screen name="PostDetail" component={PostDetailScreen} />
     <FeedStack.Screen name="PetProfile" component={PetProfileScreen as any} />
+    <FeedStack.Screen name="EditPet" component={EditPetScreen as any} />
     <FeedStack.Screen name="Profile" component={ProfileScreen} />
+    <FeedStack.Screen name="FollowersList" component={FollowersListScreen} />
     <FeedStack.Screen name="ChatList" component={ChatListScreen} />
     <FeedStack.Screen name="ChatRoom" component={ChatRoomScreen as any} />
     <FeedStack.Screen name="NewChat" component={NewChatScreen} />
@@ -84,6 +95,8 @@ const ExploreNavigator = () => (
     <ExploreStack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
     <ExploreStack.Screen name="CommunityMembers" component={CommunityMembersScreen} />
     <ExploreStack.Screen name="Profile" component={ProfileScreen} />
+    <ExploreStack.Screen name="FollowersList" component={FollowersListScreen} />
+    <ExploreStack.Screen name="ChatRoom" component={ChatRoomScreen as any} />
     <ExploreStack.Screen name="EventDetail" component={EventDetailScreen as any} />
     <ExploreStack.Screen name="HashtagFeed" component={FeedScreen} />
     <ExploreStack.Screen
@@ -110,6 +123,11 @@ const EventsNavigator = () => (
   <EventsStack.Navigator screenOptions={{ headerShown: false }}>
     <EventsStack.Screen name="MapDiscovery" component={MapDiscoveryScreen} />
     <EventsStack.Screen name="EventDetail" component={EventDetailScreen as any} />
+    <EventsStack.Screen 
+      name="CreateEvent" 
+      component={CreateEventScreen}
+      options={{ presentation: 'modal' }}
+    />
   </EventsStack.Navigator>
 );
 
@@ -120,10 +138,17 @@ const ProfileNavigator = () => (
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PetProfile" component={PetProfileScreen as any} />
     <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
+    <ProfileStack.Screen name="EditPet" component={EditPetScreen as any} />
     <ProfileStack.Screen name="Settings" component={SettingsScreen} />
     <ProfileStack.Screen name="AddPet" component={AddPetScreen} />
-    <ProfileStack.Screen name="FollowersList" component={ProfileScreen} />
+    <ProfileStack.Screen name="FollowersList" component={FollowersListScreen} />
     <ProfileStack.Screen name="ChatRoom" component={ChatRoomScreen as any} />
+    <ProfileStack.Screen name="PasswordSecurity" component={PasswordSecurityScreen as any} />
+    <ProfileStack.Screen name="PrivacySettings" component={PrivacySettingsScreen as any} />
+    <ProfileStack.Screen name="LinkedAccounts" component={LinkedAccountsScreen as any} />
+    <ProfileStack.Screen name="ThemeSettings" component={ThemeSettingsScreen as any} />
+    <ProfileStack.Screen name="LanguageSettings" component={LanguageSettingsScreen as any} />
+    <ProfileStack.Screen name="BlockedUsers" component={BlockedUsersScreen as any} />
   </ProfileStack.Navigator>
 );
 
@@ -214,7 +239,7 @@ const MainStack: React.FC = () => {
           tabPress: (e) => {
             // Prevent navigating to the Create tab — open as modal instead
             e.preventDefault();
-            navigation.navigate('Feed', {
+            (navigation as any).navigate('Feed', {
               screen: 'CreatePost',
             });
           },

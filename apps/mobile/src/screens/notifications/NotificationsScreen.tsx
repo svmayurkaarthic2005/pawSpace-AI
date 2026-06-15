@@ -280,7 +280,7 @@ export const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         break;
       case 'follow':
         if (notification.sender?._id) {
-          navigation.navigate('Profile', { userId: notification.sender._id });
+          (navigation as any).push('Profile', { userId: notification.sender._id });
         }
         break;
       case 'event_rsvp':

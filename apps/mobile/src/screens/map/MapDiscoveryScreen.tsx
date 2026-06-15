@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Keyboard, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Keyboard, Alert, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import Geolocation from '@react-native-community/geolocation';
@@ -10,7 +10,8 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import api from '../../services/api';
 import useLocation from '../../hooks/useLocation';
 import GoogleMap from '../../components/map/GoogleMap';
-import FloatingSearchBar from '../../components/map/FloatingSearchBar';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import LocationPermissionModal from '../../components/map/LocationPermissionModal';
 import LocationDeniedBanner from '../../components/map/LocationDeniedBanner';
 import SelectedEventPopup from '../../components/map/SelectedEventPopup';
@@ -49,19 +50,41 @@ const MapDiscoveryScreen: React.FC = () => {
   });
 
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
+
   const [activeBottomTab, setActiveBottomTab] = useState<'events' | 'owners'>('events');
   const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }> | null>(
     null
   );
   const [showRoute, setShowRoute] = useState(false);
-
+  const [isFollowingUser, setIsFollowingUser] = useState(true);
   const mapRef = useRef<any>(null);
+
+  // Log location state on mount and changes
+  useEffect(() => {
+    console.log('📍 MapDiscoveryScreen location state:', {
+      granted: location.granted,
+      coords: location.coords,
+      denied: location.denied,
+      blocked: location.blocked
+    });
+  }, [location.granted, location.coords, location.denied, location.blocked]);
+
+  // Call getCurrentLocation explicitly on mount
+  useEffect(() => {
+    console.log('📍 MapDiscoveryScreen explicit location fetch on mount');
+    location.getCurrentLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Only fetch location initially if we don't have it
+    if (!location.coords && !location.granted) {
+       location.getCurrentLocation();
+    }
+  }, []);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const filterSheetRef = useRef<BottomSheet>(null);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const watchIdRef = useRef<number | null>(null);
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
@@ -93,6 +116,8 @@ const MapDiscoveryScreen: React.FC = () => {
   // NOTE: Removed periodic location refresh interval - the watch already handles location updates
   // The watch updates location when user moves 50m or every 15s, which is sufficient
 
+  console.log('🗺️ MapDiscoveryScreen render location:', location?.coords);
+
   // Fetch nearby events
   const { data: eventsData, isLoading: isLoadingEvents } = useQuery({
     queryKey: ['map-events', location?.coords?.latitude, location?.coords?.longitude, filters],
@@ -116,7 +141,7 @@ const MapDiscoveryScreen: React.FC = () => {
         .get('/map/events', { params })
         .then((r) => r.data);
     },
-    enabled: !!location.coords,
+    enabled: !!location?.coords?.latitude && !!location?.coords?.longitude,
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
@@ -143,76 +168,14 @@ const MapDiscoveryScreen: React.FC = () => {
         .get('/map/users', { params })
         .then((r) => r.data);
     },
-    enabled: !!location.coords,
+    enabled: !!location?.coords?.latitude && !!location?.coords?.longitude,
     staleTime: 60_000,
   });
 
   const events = eventsData?.events ?? [];
   const nearbyUsers = usersData?.users ?? [];
 
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-    
-    // Clear existing timeout
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
-      searchDebounceRef.current = null;
-    }
 
-    if (text.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    searchDebounceRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) return;
-      
-      // Capture current location values to avoid using stale closure values
-      const currentLat = location.coords?.latitude;
-      const currentLng = location.coords?.longitude;
-      
-      try {
-        const res = await api.get('/map/geocode', {
-          params: {
-            q: text,
-            lat: currentLat,
-            lng: currentLng,
-          },
-        });
-        
-        if (isMountedRef.current) {
-          setSearchResults(res.data.results);
-        }
-      } catch (error) {
-        console.error('Geocode search error:', error);
-      }
-    }, 400);
-  }, []); // Remove location deps - use current values from closure at execution time
-
-  // Cleanup search debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-        searchDebounceRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleSelectPlace = useCallback((result: PlaceResult) => {
-    setSearchQuery(result.name);
-    setShowSearchResults(false);
-    Keyboard.dismiss();
-    mapRef.current?.animateToRegion(
-      {
-        latitude: result.lat,
-        longitude: result.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      },
-      600
-    );
-  }, []);
 
   const handleGetDirections = useCallback(async (event: any) => {
     if (!location.coords) {
@@ -315,15 +278,16 @@ const MapDiscoveryScreen: React.FC = () => {
       return;
     }
 
-    mapRef.current?.animateToRegion(
-      {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      },
-      600
-    );
+    setIsFollowingUser(true);
+    mapRef.current?.getCamera().then((camera: any) => {
+      mapRef.current.animateCamera(
+        {
+          center: { latitude: location.coords!.latitude, longitude: location.coords!.longitude },
+          zoom: camera.zoom || 13,
+        },
+        { duration: 600 }
+      );
+    }).catch((err: any) => console.warn(err));
     ReactNativeHapticFeedback.trigger('impactLight');
   }, [location]);
 
@@ -352,6 +316,8 @@ const MapDiscoveryScreen: React.FC = () => {
         mapRef={mapRef}
         routeCoordinates={routeCoordinates}
         showRoute={showRoute}
+        isFollowingUser={isFollowingUser}
+        onUserInteraction={() => setIsFollowingUser(false)}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
       />
@@ -362,20 +328,93 @@ const MapDiscoveryScreen: React.FC = () => {
 
       {(location.denied || location.blocked) && <LocationDeniedBanner blocked={location.blocked} />}
 
-      <FloatingSearchBar
-        query={searchQuery}
-        onChange={handleSearchChange}
-        onFocus={() => setShowSearchResults(true)}
-        onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
-        onFilterPress={() => filterSheetRef.current?.expand()}
-        results={searchResults}
-        showResults={showSearchResults}
-        onSelectResult={handleSelectPlace}
-        onClear={() => {
-          setSearchQuery('');
-          setSearchResults([]);
-        }}
-      />
+      {location.granted && !location.coords && (
+        <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+          <ActivityIndicator size="large" color="#7C3AED" />
+        </View>
+      )}
+
+      <SafeAreaView style={styles.searchSafeArea} edges={['top']}>
+        <View style={styles.searchContainer}>
+          <GooglePlacesAutocomplete
+            placeholder="Search for places..."
+            fetchDetails={true}
+            onPress={(data, details = null) => {
+              Keyboard.dismiss();
+              if (details?.geometry?.location) {
+                mapRef.current?.animateToRegion(
+                  {
+                    latitude: details.geometry.location.lat,
+                    longitude: details.geometry.location.lng,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                  },
+                  600
+                );
+              }
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY,
+              language: 'en',
+            }}
+            styles={{
+              container: { flex: 1 },
+              textInputContainer: {
+                backgroundColor: 'rgba(13,13,26,0.92)',
+                borderRadius: 16,
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.12)',
+                paddingHorizontal: 6,
+                height: 52,
+                flexDirection: 'row',
+                alignItems: 'center',
+              },
+              textInput: {
+                backgroundColor: 'transparent',
+                color: '#fff',
+                fontSize: 15,
+                height: 48,
+                margin: 0,
+                padding: 0,
+              },
+              listView: {
+                backgroundColor: 'rgba(13,13,26,0.97)',
+                borderRadius: 12,
+                marginTop: 4,
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.1)',
+                position: 'absolute',
+                top: 56,
+                left: 0,
+                right: 0,
+                zIndex: 200,
+                elevation: 10,
+              },
+              row: {
+                backgroundColor: 'transparent',
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                borderBottomWidth: 0.5,
+                borderBottomColor: 'rgba(255,255,255,0.05)',
+              },
+              description: {
+                color: '#fff',
+                fontSize: 14,
+              },
+              separator: {
+                height: 0,
+              },
+            }}
+            textInputProps={{
+              placeholderTextColor: 'rgba(255,255,255,0.3)',
+            }}
+            enablePoweredByContainer={false}
+          />
+          <TouchableOpacity onPress={() => filterSheetRef.current?.expand()} style={styles.filterBtn}>
+            <Icon name="options" color="#A78BFA" size={20} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
       {selectedMarker?.type === 'event' && (
         <SelectedEventPopup
@@ -395,7 +434,18 @@ const MapDiscoveryScreen: React.FC = () => {
       )}
 
       <TouchableOpacity style={styles.myLocationBtn} onPress={handleRecenterLocation}>
-        <Icon name="locate" color="#7C3AED" size={20} />
+        <Icon name={isFollowingUser ? "navigate" : "navigate-outline"} color={isFollowingUser ? "#7C3AED" : "#333333"} size={22} />
+      </TouchableOpacity>
+
+      {/* Create Event FAB */}
+      <TouchableOpacity 
+        style={styles.createEventFab}
+        onPress={() => {
+          ReactNativeHapticFeedback.trigger('impactMedium');
+          navigation.navigate('CreateEvent');
+        }}
+      >
+        <Icon name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
 
       <BottomSheet
@@ -449,6 +499,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0D1A',
   },
+  loadingOverlay: {
+    backgroundColor: '#0D0D1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+  },
   bottomSheetBg: {
     backgroundColor: 'rgba(13,13,26,0.97)',
     borderTopLeftRadius: 20,
@@ -461,7 +517,7 @@ const styles = StyleSheet.create({
   myLocationBtn: {
     position: 'absolute',
     right: 16,
-    bottom: 220,
+    bottom: 384,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -476,6 +532,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  createEventFab: {
+    position: 'absolute',
+    left: 16,
+    bottom: 280,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 40,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  searchSafeArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 8,
+    gap: 8,
+    zIndex: 100,
+  },
+  filterBtn: {
+    backgroundColor: 'rgba(13,13,26,0.92)',
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

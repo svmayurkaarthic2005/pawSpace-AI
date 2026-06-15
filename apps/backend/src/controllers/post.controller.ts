@@ -2,6 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { postService } from '../services/post.service';
 import { AppError } from '../middleware/error';
 import { successResponse } from '../utils';
+import { Block } from '../models/block.model';
+
+const getBlockedIds = async (userId?: string): Promise<string[]> => {
+  if (!userId) return [];
+  const blockedDocs = await Block.find({ blocker: userId }).distinct('blocked');
+  const blockedMeDocs = await Block.find({ blocked: userId }).distinct('blocker');
+  return [...blockedDocs, ...blockedMeDocs].map(id => id.toString());
+};
 
 export const createPost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -56,16 +64,26 @@ export const getFeed = async (req: Request, res: Response, next: NextFunction): 
   try {
     if (!req.user) throw new AppError('Not authenticated', 401, true, 'NOT_AUTHENTICATED');
     const { cursor, limit } = req.query as { cursor?: string; limit?: string };
-    const result = await postService.getFeed(req.user.userId, cursor, limit ? parseInt(limit) : 20);
+    const blockedIds = await getBlockedIds(req.user.userId);
+    const result = await postService.getFeed(req.user.userId, cursor, limit ? parseInt(limit) : 20, blockedIds);
     res.status(200).json(successResponse(result, 'Feed retrieved'));
   } catch (err) { next(err); }
 };
 
 export const getExplorePosts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { page = '1', limit = '20' } = req.query as { page?: string; limit?: string };
-    const result = await postService.getExplorePosts(parseInt(page), parseInt(limit));
-    res.status(200).json(successResponse(result, 'Explore posts retrieved'));
+    const { page = '1', limit = '20', userId } = req.query as { page?: string; limit?: string; userId?: string };
+    
+    let result;
+    const blockedIds = await getBlockedIds(req.user?.userId);
+    
+    if (userId) {
+      result = await postService.getPostsByUser(userId, parseInt(page), parseInt(limit));
+    } else {
+      result = await postService.getExplorePosts(parseInt(page), parseInt(limit), blockedIds);
+    }
+    
+    res.status(200).json(successResponse(result, 'Posts retrieved'));
   } catch (err) { next(err); }
 };
 

@@ -18,12 +18,15 @@ const SYSTEM_PROMPT = `You are PawSpace AI, a warm, knowledgeable, and friendly 
 
 CORE RULES:
 1. NEVER diagnose medical conditions — always recommend consulting a licensed veterinarian for health concerns
-2. Be warm, encouraging, and use pet-owner friendly language (not overly clinical)
-3. Use the pet's name when you know it — it makes responses feel personal
-4. Keep responses concise but complete — use bullet points for lists
-5. Add relevant emojis sparingly to make responses feel friendly (🐾 🐕 🐈 ❤️)
-6. If asked about emergencies (vomiting blood, seizures, difficulty breathing), immediately direct to emergency vet
-7. Acknowledge the emotional bond between owners and their pets
+2. NEVER make up or assume information about the pet that wasn't explicitly provided (age, health conditions, behaviors, etc.)
+3. If you don't know specific details about the pet, ask clarifying questions or provide general advice for the breed/species
+4. Be warm, encouraging, and use pet-owner friendly language (not overly clinical)
+5. Use the pet's name when you know it — it makes responses feel personal
+6. Keep responses concise but complete — use bullet points for lists
+7. Add relevant emojis sparingly to make responses feel friendly (🐾 🐕 🐈 ❤️)
+8. If asked about emergencies (vomiting blood, seizures, difficulty breathing), immediately direct to emergency vet
+9. Acknowledge the emotional bond between owners and their pets
+10. ONLY reference pet details that are explicitly provided in the pet context - do not invent ages, conditions, or history
 
 EXPERTISE AREAS:
 - Nutrition and diet recommendations by species/breed/age
@@ -32,7 +35,11 @@ EXPERTISE AREAS:
 - Behavioral guidance and training tips
 - Preventive care schedules (vaccines, flea/tick, dental)
 - Life stage care (puppy/kitten, adult, senior)
-- Common breed-specific traits and needs`;
+- Common breed-specific traits and needs
+
+IMPORTANT: When pet details like age or health history are not provided, acknowledge this and either:
+- Ask the owner for this information if it's relevant to their question
+- Provide general guidance that applies across age ranges or health statuses`;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -50,10 +57,17 @@ export class PetAssistantAIService extends BaseAIService {
     history: ChatMessage[],
     userMessage: string,
   ): Promise<string> {
-    const petContext = `The user is asking about their pet: ${pet.name}, a ${pet.age ? `${pet.age}-year-old ` : ''}${pet.gender ? `${pet.gender} ` : ''}${pet.breed ?? pet.species}${pet.bio ? `. About ${pet.name}: ${pet.bio}` : ''}.`;
+    // Build pet context with only provided information
+    const petDetails: string[] = [`Name: ${pet.name}`, `Species: ${pet.species}`];
+    if (pet.breed) petDetails.push(`Breed: ${pet.breed}`);
+    if (pet.age !== undefined && pet.age !== null) petDetails.push(`Age: ${pet.age} years`);
+    if (pet.gender) petDetails.push(`Gender: ${pet.gender}`);
+    if (pet.bio) petDetails.push(`Bio: ${pet.bio}`);
+    
+    const petContext = `The user is asking about their pet:\n${petDetails.join('\n')}\n\nIMPORTANT: Only use the information provided above. Do not assume or invent additional details about ${pet.name}.`;
 
     const messages: ChatMessage[] = [
-      { role: 'system', content: `${SYSTEM_PROMPT}\n\nCURRENT PET CONTEXT: ${petContext}` },
+      { role: 'system', content: `${SYSTEM_PROMPT}\n\n${petContext}` },
       // Keep last 10 messages for context window efficiency
       ...history.slice(-10),
       { role: 'user', content: userMessage },
@@ -77,10 +91,17 @@ export class PetAssistantAIService extends BaseAIService {
     history: ChatMessage[],
     userMessage: string,
   ): AsyncGenerator<string> {
-    const petContext = `The user is asking about their pet: ${pet.name}, a ${pet.age ? `${pet.age}-year-old ` : ''}${pet.gender ? `${pet.gender} ` : ''}${pet.breed ?? pet.species}${pet.bio ? `. About ${pet.name}: ${pet.bio}` : ''}.`;
+    // Build pet context with only provided information
+    const petDetails: string[] = [`Name: ${pet.name}`, `Species: ${pet.species}`];
+    if (pet.breed) petDetails.push(`Breed: ${pet.breed}`);
+    if (pet.age !== undefined && pet.age !== null) petDetails.push(`Age: ${pet.age} years`);
+    if (pet.gender) petDetails.push(`Gender: ${pet.gender}`);
+    if (pet.bio) petDetails.push(`Bio: ${pet.bio}`);
+    
+    const petContext = `The user is asking about their pet:\n${petDetails.join('\n')}\n\nIMPORTANT: Only use the information provided above. Do not assume or invent additional details about ${pet.name}.`;
 
     const messages: ChatMessage[] = [
-      { role: 'system', content: `${SYSTEM_PROMPT}\n\nCURRENT PET CONTEXT: ${petContext}` },
+      { role: 'system', content: `${SYSTEM_PROMPT}\n\n${petContext}` },
       ...history.slice(-10),
       { role: 'user', content: userMessage },
     ];

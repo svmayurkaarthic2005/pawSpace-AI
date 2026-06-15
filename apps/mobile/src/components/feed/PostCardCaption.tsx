@@ -20,7 +20,7 @@ const PostCardCaption: React.FC<PostCardCaptionProps> = ({ post }) => {
       <Text style={styles.captionText} numberOfLines={expanded ? undefined : 3}>
         <Text
           style={styles.username}
-          onPress={() => navigation.navigate('Profile', { userId: post.author._id })}
+          onPress={() => navigation.push('Profile', { userId: post.author._id })}
         >
           {post.author.username}
         </Text>

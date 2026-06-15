@@ -16,6 +16,8 @@ export type FCMNotificationType =
   | 'new_like'
   | 'new_comment'
   | 'new_follower'
+  | 'follow_request'
+  | 'follow_accept'
   | 'event_reminder'
   | 'ai_suggestion';
 
@@ -65,6 +67,18 @@ const buildPayload = (data: FCMNotificationData): FCMNotificationPayload => {
         title: '👤 New follower',
         body: `${data.followerName ?? 'Someone'} started following you`,
         data: { type: 'new_follower', userId: data.followerId ?? '' },
+      };
+    case 'follow_request':
+      return {
+        title: '👤 Follow Request',
+        body: `${data.followerName ?? 'Someone'} requested to follow you`,
+        data: { type: 'follow_request', userId: data.followerId ?? '' },
+      };
+    case 'follow_accept':
+      return {
+        title: '👤 Request Accepted',
+        body: `${data.followerName ?? 'Someone'} accepted your follow request`,
+        data: { type: 'follow_accept', userId: data.followerId ?? '' },
       };
     case 'event_reminder':
       return {

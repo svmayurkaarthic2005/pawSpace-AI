@@ -54,24 +54,43 @@ export class PostRepository {
   }
 
   /**
-   * Cursor-based feed: posts from followed users + own posts, newest first.
+   * Cursor-based feed: posts from followed users + followed pets + own posts, newest first.
    * cursor = createdAt ISO string of the last seen post.
    */
   async getFeed(
     userId: string,
-    followingIds: string[],
+    followedUserIds: string[],
+    followedPetIds: string[],
     limit: number = DEFAULT_LIMIT,
     cursor?: string,
+    blockedIds: string[] = []
   ): Promise<CursorPage<IPost>> {
+    // Convert to ObjectIds
     const authorIds = [
-      new mongoose.Types.ObjectId(userId),
-      ...followingIds.map((id) => new mongoose.Types.ObjectId(id)),
+      new mongoose.Types.ObjectId(userId), // Include user's own posts
+      ...followedUserIds.map((id) => new mongoose.Types.ObjectId(id)),
     ];
 
+    const petIds = followedPetIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    // Build query: posts from followed users OR posts from followed pets
+    const orConditions: mongoose.FilterQuery<IPost>[] = [
+      { author: { $in: authorIds } }, // Posts by followed users (or own posts)
+    ];
+
+    // Only add pet condition if user follows any pets
+    if (petIds.length > 0) {
+      orConditions.push({ pet: { $in: petIds } }); // Posts tagged with followed pets
+    }
+
     const query: mongoose.FilterQuery<IPost> = {
-      author: { $in: authorIds },
+      $or: orConditions,
       visibility: { $in: ['public', 'followers'] },
     };
+
+    if (blockedIds && blockedIds.length > 0) {
+      query.author = { $nin: blockedIds.map(id => new mongoose.Types.ObjectId(id)) };
+    }
 
     if (cursor) {
       query.createdAt = { $lt: new Date(cursor) };
@@ -102,10 +121,17 @@ export class PostRepository {
   async getExplorePosts(
     page: number = 1,
     limit: number = DEFAULT_LIMIT,
+    blockedIds: string[] = []
   ): Promise<{ items: IPost[]; total: number }> {
     const skip = (page - 1) * limit;
+    
+    const query: mongoose.FilterQuery<IPost> = { visibility: 'public' };
+    if (blockedIds && blockedIds.length > 0) {
+      query.author = { $nin: blockedIds.map(id => new mongoose.Types.ObjectId(id)) };
+    }
+
     const [items, total] = await Promise.all([
-      Post.find({ visibility: 'public' })
+      Post.find(query)
         .sort({ likesCount: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -113,7 +139,7 @@ export class PostRepository {
         .populate('pet', 'name species breed images')
         .lean()
         .exec(),
-      Post.countDocuments({ visibility: 'public' }),
+      Post.countDocuments(query),
     ]);
     return { items: items as unknown as IPost[], total };
   }

@@ -8,6 +8,9 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  PermissionsAndroid,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -135,14 +138,41 @@ const LocationSheet = forwardRef<BottomSheet, LocationSheetProps>(
       }
     };
 
-    const handleUseCurrentLocation = () => {
+    const handleUseCurrentLocation = async () => {
+      if (Platform.OS === 'android') {
+        try {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            {
+              title: 'Location Permission',
+              message: 'App needs access to your location to find you.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert('Permission Denied', 'Location permission is required.');
+            return;
+          }
+        } catch (err) {
+          console.warn(err);
+          return;
+        }
+      }
+
       Geolocation.getCurrentPosition(
         async (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('📍 LocationSheet Raw GPS Coords:', { latitude, longitude });
+
           try {
-            const { latitude, longitude } = position.coords;
+            console.log('🌍 Calling /google-places/reverse-geocode');
             const { data } = await api.get<{ data: GooglePlace }>('/google-places/reverse-geocode', {
               params: { lat: latitude, lng: longitude },
+              timeout: 10000,
             });
+            console.log('🌍 LocationSheet Geocode Response:', data);
 
             const place = data.data;
             if (place && place.coordinates) {
@@ -151,10 +181,33 @@ const LocationSheet = forwardRef<BottomSheet, LocationSheetProps>(
                 coordinates: place.coordinates,
               });
               await saveRecentLocation(place);
+            } else {
+              throw new Error('Invalid place data returned');
             }
-          } catch (error) {
-            console.error('Reverse geocode error:', error);
-            Alert.alert('Error', 'Failed to get current location name');
+          } catch (error: any) {
+            console.error('Reverse geocode error:', error.message || error);
+            
+            // Added detailed logging per requirements
+            console.log('🌍 Axios Error Details:', {
+              url: error.config?.url,
+              baseURL: error.config?.baseURL,
+              code: error.code,
+              message: error.message,
+              hasResponse: !!error.response
+            });
+            
+            // Fallback logic
+            const fallbackLocationName = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            onSelectLocation({
+              name: fallbackLocationName,
+              coordinates: [longitude, latitude],
+            });
+            
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('Could not fetch address, but location detected', ToastAndroid.SHORT);
+            } else {
+              Alert.alert('Location Detected', 'Could not fetch address, but exact coordinates were saved.');
+            }
           }
         },
         (error) => {

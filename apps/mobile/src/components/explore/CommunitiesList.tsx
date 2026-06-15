@@ -1,31 +1,29 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Community } from '../../types';
+import { Community, ExploreStackParamList } from '../../types';
 
 interface CommunitiesListProps {
   communities: Community[];
 }
 
 export const CommunitiesList: React.FC<CommunitiesListProps> = ({ communities }) => {
-  const navigation = useNavigation();
+  type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'CommunityDetail'>;
+  const navigation = useNavigation<NavigationProp>();
 
   const handleCommunityPress = (communityId: string) => {
-    navigation.navigate('CommunityDetail' as never, { communityId } as never);
+    navigation.navigate('CommunityDetail', { communityId });
   };
 
   return (
-    <ScrollView
-      horizontal={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-    >
-      {communities.map((community) => (
+    <View style={styles.container}>
+      {communities.map((community: any) => (
         <TouchableOpacity
-          key={community.id}
+          key={community._id || community.id}
           style={styles.card}
-          onPress={() => handleCommunityPress(community.id)}
+          onPress={() => handleCommunityPress(community._id || community.id)}
           activeOpacity={0.8}
         >
           {/* Avatar */}
@@ -49,9 +47,9 @@ export const CommunitiesList: React.FC<CommunitiesListProps> = ({ communities })
             </Text>
 
             {/* Species Tags */}
-            {community.species.length > 0 && (
+            {(community.species ?? []).length > 0 && (
               <View style={styles.tagsContainer}>
-                {community.species.slice(0, 3).map((species) => (
+                {(community.species ?? []).slice(0, 3).map((species) => (
                   <View key={species} style={styles.tag}>
                     <Text style={styles.tagText}>{species}</Text>
                   </View>
@@ -63,17 +61,17 @@ export const CommunitiesList: React.FC<CommunitiesListProps> = ({ communities })
             <View style={styles.stats}>
               <View style={styles.stat}>
                 <Icon name="people-outline" size={14} color="#9CA3AF" />
-                <Text style={styles.statText}>{community.memberCount} members</Text>
+                <Text style={styles.statText}>{community.memberCount ?? 0} members</Text>
               </View>
               <View style={styles.stat}>
                 <Icon name="chatbubbles-outline" size={14} color="#9CA3AF" />
-                <Text style={styles.statText}>{community.postCount} posts</Text>
+                <Text style={styles.statText}>{community.postCount ?? 0} posts</Text>
               </View>
             </View>
           </View>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 

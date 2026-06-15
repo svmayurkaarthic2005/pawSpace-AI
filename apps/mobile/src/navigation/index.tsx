@@ -62,6 +62,15 @@ const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading, initialize } = useAuthStore();
   const user = useUser(); // Use the selector hook to ensure re-renders
   const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
+
+  // Debug: log auth/navigation state to help track crash during navigator mount
+  // This log is intentionally lightweight to avoid leaking sensitive data.
+  console.log('[Navigator] render attempt:', {
+    isAuthenticated: !!isAuthenticated,
+    isLoading: !!isLoading,
+    hasUser: !!user,
+    userId: user?.id ?? null,
+  });
   
   /**
    * null  = still checking
@@ -135,7 +144,7 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen 
             name="Auth" 
             component={AuthStack} 
-            initialParams={{ skipOnboarding: true }}
+            initialParams={{ skipOnboarding: true } as any}
           />
         ) : isAuthenticated ? (
           // Already logged in with complete profile → go to main app
@@ -154,7 +163,7 @@ const RootNavigator: React.FC = () => {
           <Stack.Screen
             name="Auth"
             component={AuthStack}
-            initialParams={{ skipOnboarding: onboardingDone }}
+            initialParams={{ skipOnboarding: onboardingDone || false } as any}
           />
         )}
       </Stack.Navigator>

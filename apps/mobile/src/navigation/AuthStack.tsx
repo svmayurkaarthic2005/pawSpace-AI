@@ -26,8 +26,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 const AuthStack: React.FC<Props> = ({ route }) => {
   const user = useUser();
   
-  // @ts-ignore – initialParams is typed as unknown on the root stack
-  const skipOnboarding = route?.params?.skipOnboarding as boolean | undefined;
+  // Safely extract params with proper null checking
+  const params = route?.params || {};
+  const skipOnboarding = (params as any)?.skipOnboarding === true;
   
   // Determine initial route
   let initialRoute: keyof AuthStackParamList;

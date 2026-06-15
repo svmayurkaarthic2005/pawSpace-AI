@@ -5,7 +5,9 @@ import { redis } from '../config/redis';
 
 const KEYS = {
   feed: (userId: string) => `feed:${userId}`,
-  followers: (userId: string) => `followers:${userId}`,
+  followers: (userId: string) => `followers:${userId}`, // DEPRECATED: Use userFollowers/petFollowers
+  userFollowers: (userId: string) => `user:followers:${userId}`,
+  petFollowers: (petId: string) => `pet:followers:${petId}`,
   aiResponse: (feature: string, hash: string) => `ai:${feature}:${hash}`,
   presence: (userId: string) => `presence:${userId}`,
   session: (userId: string) => `session:${userId}`,
@@ -71,8 +73,9 @@ export class CacheService {
    * Invalidate feed caches for all followers of a user.
    * Called when a user creates/deletes a post.
    * Follower list is stored as a Redis Set: followers:{userId}
+   * @deprecated Use invalidateFollowerFeeds(entityId, entityType) instead
    */
-  async invalidateFollowerFeeds(userId: string): Promise<void> {
+  async invalidateFollowerFeeds_DEPRECATED(userId: string): Promise<void> {
     const followerIds = await redis.smembers(KEYS.followers(userId));
     if (followerIds.length === 0) return;
 
@@ -86,6 +89,7 @@ export class CacheService {
   /**
    * Add a follower to the cached follower set for a user.
    * Called when a follow relationship is created.
+   * @deprecated Use addFollowerToSet instead for entity-type awareness
    */
   async addFollower(userId: string, followerId: string): Promise<void> {
     await redis.sadd(KEYS.followers(userId), followerId);
@@ -93,9 +97,59 @@ export class CacheService {
 
   /**
    * Remove a follower from the cached follower set.
+   * @deprecated Use removeFollowerFromSet instead for entity-type awareness
    */
   async removeFollower(userId: string, followerId: string): Promise<void> {
     await redis.srem(KEYS.followers(userId), followerId);
+  }
+
+  /**
+   * Add a follower to the entity-specific cached follower set.
+   * Called when a follow relationship is created.
+   */
+  async addFollowerToSet(
+    entityId: string,
+    entityType: 'User' | 'Pet',
+    followerId: string,
+  ): Promise<void> {
+    const key = entityType === 'User' ? KEYS.userFollowers(entityId) : KEYS.petFollowers(entityId);
+    await redis.sadd(key, followerId);
+    await redis.expire(key, 3600); // 1 hour TTL
+  }
+
+  /**
+   * Remove a follower from the entity-specific cached follower set.
+   */
+  async removeFollowerFromSet(
+    entityId: string,
+    entityType: 'User' | 'Pet',
+    followerId: string,
+  ): Promise<void> {
+    const key = entityType === 'User' ? KEYS.userFollowers(entityId) : KEYS.petFollowers(entityId);
+    await redis.srem(key, followerId);
+  }
+
+  /**
+   * Get follower IDs for an entity from cache.
+   */
+  async getFollowerIds(entityId: string, entityType: 'User' | 'Pet'): Promise<string[]> {
+    const key = entityType === 'User' ? KEYS.userFollowers(entityId) : KEYS.petFollowers(entityId);
+    return redis.smembers(key);
+  }
+
+  /**
+   * Invalidate feed caches for all followers of an entity.
+   * Called when an entity (user or pet) creates/deletes a post.
+   */
+  async invalidateFollowerFeeds(entityId: string, entityType: 'User' | 'Pet'): Promise<void> {
+    const followerIds = await this.getFollowerIds(entityId, entityType);
+    if (followerIds.length === 0) return;
+
+    const pipeline = redis.pipeline();
+    for (const followerId of followerIds) {
+      pipeline.del(KEYS.feed(followerId));
+    }
+    await pipeline.exec();
   }
 
   // ══════════════════════════════════════════════════════════════════════════

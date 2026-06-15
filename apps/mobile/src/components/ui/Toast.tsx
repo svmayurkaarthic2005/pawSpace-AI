@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   withTiming, runOnJS,
 } from 'react-native-reanimated';
 import { create } from 'zustand';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Toast Store ──────────────────────────────────────────────────────────────
 
@@ -56,17 +54,28 @@ const TYPE_ICONS: Record<ToastType, string> = {
 
 const Toast: React.FC = () => {
   const { message, type, visible, hide } = useToastStore();
+  // Use React state instead of reading SharedValue directly on the JS thread.
+  // Reading opacity.value === 0 outside a worklet causes Hermes to throw
+  // "TypeError: right operand of 'in' is not an object".
+  const [isRendered, setIsRendered] = useState(false);
+
   const translateY = useSharedValue(100);
   const opacity = useSharedValue(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const markHidden = useCallback(() => {
+    setIsRendered(false);
+    hide();
+  }, [hide]);
+
   const dismiss = useCallback(() => {
     translateY.value = withTiming(100, { duration: 250 });
-    opacity.value = withTiming(0, { duration: 250 }, () => runOnJS(hide)());
-  }, [translateY, opacity, hide]);
+    opacity.value = withTiming(0, { duration: 250 }, () => runOnJS(markHidden)());
+  }, [translateY, opacity, markHidden]);
 
   useEffect(() => {
     if (visible) {
+      setIsRendered(true);
       translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
       opacity.value = withTiming(1, { duration: 200 });
 
@@ -83,7 +92,8 @@ const Toast: React.FC = () => {
     opacity: opacity.value,
   }));
 
-  if (!visible && opacity.value === 0) return null;
+  // Guard with React state — never read SharedValue on the JS render thread
+  if (!isRendered) return null;
 
   const color = TYPE_COLORS[type];
 

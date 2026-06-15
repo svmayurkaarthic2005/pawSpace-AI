@@ -35,6 +35,7 @@ export interface MediaItem {
   type: 'image' | 'video';
   fileName: string;
   filter?: string;
+  duration?: number; // Video duration in seconds
 }
 
 export interface SelectedPet {
@@ -97,12 +98,26 @@ const CreatePostScreen: React.FC = () => {
 
       if (result.didCancel || !result.assets) return;
 
+      // Validate video duration (max 59 seconds)
+      for (const asset of result.assets) {
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+      }
+
       const newMedia: MediaItem[] = result.assets
         .filter((asset) => asset.uri && asset.fileName)
         .map((asset) => ({
           uri: asset.uri!,
           type: asset.type?.startsWith('video') ? 'video' : 'image',
           fileName: asset.fileName!,
+          duration: asset.duration,
         }));
 
       const hasVideo = newMedia.some((m) => m.type === 'video') || media.some((m) => m.type === 'video');

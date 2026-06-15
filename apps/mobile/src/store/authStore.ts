@@ -3,7 +3,7 @@ import * as Keychain from 'react-native-keychain';
 import { User } from '../types';
 import { saveTokens, clearTokens, setLogoutCallback, setTokenRefreshCallback } from '../services/api';
 import { authApi } from '../services/auth.service';
-import { onAuthStateChanged as firebaseOnAuthStateChanged } from '../services/firebaseAuth.service';
+import { onAuthStateChanged as firebaseOnAuthStateChanged, signOut as firebaseSignOut } from '../services/firebaseAuth.service';
 import { socketService } from '../services/socket.service';
 import { eventApi } from '../services/event.service';
 import { STORAGE_KEYS } from '../constants';
@@ -13,7 +13,6 @@ import { STORAGE_KEYS } from '../constants';
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  token: string | null; // Alias for accessToken for compatibility
   clerkToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -34,7 +33,6 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   accessToken: null,
-  get token() { return this.accessToken; }, // Alias for compatibility
   clerkToken: null,
   isAuthenticated: false,
   isLoading: true,
@@ -83,6 +81,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       // Disconnect socket
       socketService.disconnect();
+
+      // Sign out from Firebase and Google to prevent auto-login
+      try {
+        await firebaseSignOut();
+      } catch (e) {
+        console.warn('[AuthStore] Firebase sign out error:', e);
+      }
 
       await clearTokens();
       set({ 
@@ -150,8 +155,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           return;
         } catch (error: any) {
-          // If token is expired or invalid, clear tokens and let user re-authenticate
-          console.log('[AuthStore] Session restore failed, clearing tokens:', error.message);
+          // Determine if this is a network/connectivity issue rather than an auth issue
+          const isNetworkError = 
+            error.message === 'Network Error' || 
+            error.code === 'ECONNABORTED' || 
+            !error.response || 
+            (error.response && error.response.status >= 500);
+
+          if (isNetworkError) {
+            console.log('[AuthStore] Network error during session restore. Keeping tokens safe:', error.message);
+            // We set isAuthenticated to false so they see the login screen or an offline screen, 
+            // but we DO NOT call clearTokens() so they can auto-login when they restart with network
+            set({ isLoading: false, isAuthenticated: false });
+            return;
+          }
+
+          // If token is actually expired or invalid (e.g. 401 Unauthorized), clear tokens
+          console.log('[AuthStore] Session restore failed (Auth Error), clearing tokens:', error.message);
           await clearTokens();
         }
       }
@@ -197,6 +217,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       // Sync with backend using Firebase ID token
+      const { API_BASE_URL } = require('../config/api');
+      console.log(`[AuthStore] Firing POST to backend: ${API_BASE_URL}/auth/google`);
+
       const result = await authApi.googleLogin({
         idToken,
         email: firebaseUser.email,

@@ -6,6 +6,9 @@ export type NotificationType =
   | 'like'
   | 'comment'
   | 'follow'
+  | 'follow_request'
+  | 'follow_accept'
+  | 'pet_follow'
   | 'event_invite'
   | 'event_rsvp'
   | 'chat'
@@ -48,7 +51,7 @@ const notificationSchema = new Schema<INotification, INotificationModel>(
     },
     type: {
       type: String,
-      enum: ['like', 'comment', 'follow', 'event_invite', 'event_rsvp', 'chat', 'rsvp', 'ai_suggestion', 'community_post'],
+      enum: ['like', 'comment', 'follow', 'follow_request', 'follow_accept', 'pet_follow', 'event_invite', 'event_rsvp', 'chat', 'rsvp', 'ai_suggestion', 'community_post'],
       required: [true, 'Notification type is required'],
     },
     entityId: {

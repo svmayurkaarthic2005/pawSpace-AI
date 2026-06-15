@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert, PermissionsAndroid } from 'react-native';
 import { PERMISSIONS, RESULTS, request, check } from 'react-native-permissions';
 import Geolocation from '@react-native-community/geolocation';
+import BackgroundGeolocation from 'react-native-background-geolocation';
 import api from '../services/api';
 
 type LocationState = {
@@ -17,7 +18,16 @@ const PERMISSION =
 
 // GLOBAL singleton to prevent multiple watches
 let globalWatchId: number | null = null;
-let watchCount = 0;
+let bgGeoConfigured = false;
+
+const postLocationUpdate = async (latitude: number, longitude: number, accuracy: number) => {
+  try {
+    await api.post('/map/location', { lat: latitude, lng: longitude, accuracy });
+    console.log(`📡 [Backend] Location POSTed: ${latitude}, ${longitude}`);
+  } catch (err) {
+    console.warn('Failed to update server location:', err);
+  }
+};
 
 const useLocation = () => {
   const [locationState, setLocationState] = useState<LocationState>({
@@ -29,29 +39,46 @@ const useLocation = () => {
   });
 
   const isMountedRef = useRef(true);
-  const locationFetchingRef = useRef(false); // Prevent concurrent location fetches
+  const locationFetchingRef = useRef(false);
 
   const requestPermission = useCallback(async () => {
-    const result = await request(PERMISSION);
-    if (!isMountedRef.current) return;
-    
-    if (result === RESULTS.GRANTED) {
-      setLocationState((s) => ({ ...s, granted: true, denied: false, blocked: false }));
-      getCurrentLocation();
-    } else if (result === RESULTS.DENIED) {
-      setLocationState((s) => ({ ...s, denied: true }));
-    } else if (result === RESULTS.BLOCKED) {
-      setLocationState((s) => ({ ...s, blocked: true }));
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ]);
+        if (!isMountedRef.current) return;
+        
+        if (
+          granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED ||
+          granted[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED
+        ) {
+          setLocationState((s) => ({ ...s, granted: true, denied: false, blocked: false }));
+          getCurrentLocation();
+        } else {
+          setLocationState((s) => ({ ...s, denied: true }));
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      const result = await request(PERMISSION);
+      if (!isMountedRef.current) return;
+      
+      if (result === RESULTS.GRANTED) {
+        setLocationState((s) => ({ ...s, granted: true, denied: false, blocked: false }));
+        getCurrentLocation();
+      } else if (result === RESULTS.DENIED) {
+        setLocationState((s) => ({ ...s, denied: true }));
+      } else if (result === RESULTS.BLOCKED) {
+        setLocationState((s) => ({ ...s, blocked: true }));
+      }
     }
   }, []);
 
   const getCurrentLocation = useCallback(() => {
-    // Prevent concurrent location fetches to avoid race conditions
-    if (locationFetchingRef.current) {
-      console.log('📍 Location fetch already in progress, skipping...');
-      return;
-    }
-    
+    if (locationFetchingRef.current) return;
     locationFetchingRef.current = true;
     
     Geolocation.getCurrentPosition(
@@ -60,35 +87,22 @@ const useLocation = () => {
         if (!isMountedRef.current) return;
         
         const { latitude, longitude, accuracy } = pos.coords;
-        console.log('📍 Location acquired:', { latitude, longitude, accuracy });
         setLocationState((s) => ({ ...s, coords: { latitude, longitude }, accuracy, granted: true }));
-        
-        // Update server in background
-        api
-          .post('/map/location', { lat: latitude, lng: longitude, accuracy })
-          .catch((err) => console.warn('Failed to update server location:', err));
+        postLocationUpdate(latitude, longitude, accuracy);
       },
       (error) => {
-        console.warn('Location error:', error.code, error.message);
-        // Retry with lower accuracy if high accuracy fails (timeout or position unavailable)
+        locationFetchingRef.current = false;
         if (error.code === 2 || error.code === 3) {
           Geolocation.getCurrentPosition(
             (pos) => {
-              locationFetchingRef.current = false;
               if (!isMountedRef.current) return;
-              
               const { latitude, longitude, accuracy } = pos.coords;
-              console.log('📍 Location acquired (fallback):', { latitude, longitude, accuracy });
               setLocationState((s) => ({ ...s, coords: { latitude, longitude }, accuracy, granted: true }));
+              postLocationUpdate(latitude, longitude, accuracy);
             },
-            (retryError) => {
-              locationFetchingRef.current = false;
-              console.warn('Location retry error:', retryError);
-            },
+            () => {},
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
           );
-        } else {
-          locationFetchingRef.current = false;
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
@@ -102,79 +116,105 @@ const useLocation = () => {
     if (result === RESULTS.GRANTED) {
       setLocationState((s) => ({ ...s, granted: true }));
       getCurrentLocation();
-    } else if (result === RESULTS.DENIED) {
+    } else if (result === RESULTS.DENIED || result === RESULTS.UNAVAILABLE) {
       requestPermission();
     } else if (result === RESULTS.BLOCKED) {
       setLocationState((s) => ({ ...s, blocked: true }));
-    } else {
-      requestPermission();
     }
   }, [getCurrentLocation, requestPermission]);
 
+  // Configure Transistorsoft Background Geolocation
+  const setupBackgroundGeolocation = useCallback(async () => {
+    if (bgGeoConfigured) return;
+
+    BackgroundGeolocation.onLocation((location) => {
+      console.log('📍 [BackgroundGeolocation] -', location.coords.latitude, location.coords.longitude);
+      if (!isMountedRef.current) return;
+      setLocationState((s) => ({
+        ...s,
+        coords: { latitude: location.coords.latitude, longitude: location.coords.longitude },
+        accuracy: location.coords.accuracy,
+      }));
+      postLocationUpdate(location.coords.latitude, location.coords.longitude, location.coords.accuracy);
+    }, (error) => {
+      console.warn('📍 [BackgroundGeolocation] ERROR:', error);
+    });
+
+    const state = await BackgroundGeolocation.ready({
+      desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
+      distanceFilter: 50,
+      stopOnTerminate: false,
+      startOnBoot: true,
+      debug: false,
+      logLevel: BackgroundGeolocation.LOG_LEVEL_VERBOSE,
+      notification: {
+        title: 'PawSpace is active',
+        text: 'Tracking location for nearby pet owners',
+        color: '#7C3AED'
+      }
+    });
+    bgGeoConfigured = true;
+    console.log('⚙️ [BackgroundGeolocation] ready:', state.enabled);
+  }, []);
+
+  const startBackgroundTracking = useCallback(async () => {
+    if (!bgGeoConfigured) await setupBackgroundGeolocation();
+    await BackgroundGeolocation.start();
+    console.log('▶️ [BackgroundGeolocation] started');
+  }, [setupBackgroundGeolocation]);
+
+  const stopBackgroundTracking = useCallback(async () => {
+    await BackgroundGeolocation.stop();
+    console.log('⏹️ [BackgroundGeolocation] stopped');
+  }, []);
+
   const startWatching = useCallback(() => {
-    // CRITICAL: Prevent multiple watches from being created
-    if (globalWatchId !== null) {
-      console.log('⚠️  Watch already exists (ID:', globalWatchId, '), reusing it');
-      return globalWatchId;
-    }
-    
-    watchCount++;
-    console.log('📍 Starting NEW location watch #' + watchCount);
+    if (globalWatchId !== null) return globalWatchId;
     
     const watchId = Geolocation.watchPosition(
       (pos) => {
         if (!isMountedRef.current) return;
-        
-        // Debounce rapid updates - only update if location changed significantly
         const { latitude, longitude, accuracy } = pos.coords;
         
         setLocationState((prevState) => {
           const prevCoords = prevState.coords;
-          
-          // Skip update if location hasn't changed (prevents duplicate API calls)
           if (prevCoords && 
               Math.abs(prevCoords.latitude - latitude) < 0.0001 &&
               Math.abs(prevCoords.longitude - longitude) < 0.0001) {
-            console.log('📍 Location unchanged, skipping update');
             return prevState;
           }
           
-          console.log('📍 Location watch updated:', { latitude, longitude, accuracy });
-          
-          // Update server in background (non-blocking)
-          api
-            .post('/map/location', { lat: latitude, lng: longitude, accuracy })
-            .catch((err) => console.warn('Failed to update server location:', err));
-          
+          postLocationUpdate(latitude, longitude, accuracy);
           return { ...prevState, coords: { latitude, longitude }, accuracy };
         });
       },
-      (error) => console.warn('Location watch error:', error.code, error.message),
-      { 
-        enableHighAccuracy: true, 
-        distanceFilter: 50, // Only update if moved 50m
-        interval: 15000, // Check every 15s
-        fastestInterval: 10000 // Don't check faster than 10s
-      }
+      (error) => console.warn('Location watch error:', error.message),
+      { enableHighAccuracy: true, distanceFilter: 50, interval: 15000, fastestInterval: 10000 }
     );
     
     globalWatchId = watchId;
-    console.log('✅ Watch started with GLOBAL ID:', globalWatchId);
     return watchId;
   }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
-    
-    // Check permission on mount
     checkPermission();
-
+    setupBackgroundGeolocation();
     return () => {
       isMountedRef.current = false;
+      // We don't remove background geolocation listeners here to allow them to live as singletons
     };
-  }, []); // Run only once on mount
+  }, []);
 
-  return { ...locationState, requestPermission, checkPermission, getCurrentLocation, startWatching };
+  return { 
+    ...locationState, 
+    requestPermission, 
+    checkPermission, 
+    getCurrentLocation, 
+    startWatching,
+    startBackgroundTracking,
+    stopBackgroundTracking
+  };
 };
 
 export default useLocation;

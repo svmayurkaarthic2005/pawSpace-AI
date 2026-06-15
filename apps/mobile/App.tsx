@@ -8,7 +8,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import RootNavigator from './src/navigation';
 import { configureGoogleSignIn } from './src/services/firebaseAuth.service';
-import { useAuthStore } from './src/store/authStore';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -74,20 +73,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 // ─── App Content ──────────────────────────────────────────────────────────────
 
 function AppContent() {
-  const { initialize } = useAuthStore();
-
   useEffect(() => {
     try {
       // Configure Google Sign-In
       configureGoogleSignIn();
-      
-      // Initialize auth
-      void initialize();
     } catch (error) {
       console.error('[App] Initialization error:', error);
       Alert.alert('Initialization Error', 'Failed to initialize app. Please restart.');
     }
-  }, [initialize]);
+  }, []);
 
   return <RootNavigator />;
 }

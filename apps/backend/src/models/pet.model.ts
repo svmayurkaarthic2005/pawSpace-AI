@@ -21,8 +21,9 @@ export interface IPet extends Document {
   gender: PetGender;
   bio?: string;
   images: IPetImage[];
-  followers: mongoose.Types.ObjectId[];
-  followerCount: number;
+  followers: mongoose.Types.ObjectId[]; // @deprecated Use Follow collection instead. Remove after migration verified.
+  followerCount: number; // Denormalized count from Follow collection
+  followersLegacyMigrated?: boolean; // Migration tracking flag
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,11 +92,19 @@ const petSchema = new Schema<IPet, IPetModel>(
     followers: {
       type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
       default: [],
+      // DEPRECATED: This field is deprecated and will be removed in a future version.
+      // Use the Follow collection instead for querying pet followers.
+      // After migration is verified, this field should be removed from the schema.
     },
     followerCount: {
       type: Number,
       default: 0,
       min: 0,
+    },
+    followersLegacyMigrated: {
+      type: Boolean,
+      default: false,
+      // Migration tracking: true if followers have been migrated to Follow collection
     },
   },
   {

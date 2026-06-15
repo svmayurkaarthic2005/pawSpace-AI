@@ -25,14 +25,11 @@ import { ProfileStackParamList } from '../../types';
 import { SPACING, STORAGE_KEYS, QUERY_KEYS } from '../../constants';
 import { petApi } from '../../services/post.service';
 import api from '../../services/api';
+import useLocation from '../../hooks/useLocation';
 
 // ─── Settings Keys ────────────────────────────────────────────────────────────
 const SETTINGS_KEYS = {
   LOCATION_SHARING: '@settings/locationSharing',
-  AI_PET_ASSISTANT: '@settings/aiPetAssistant',
-  AI_CAPTION_GENERATOR: '@settings/aiCaptionGenerator',
-  AI_FEED_PERSONALIZATION: '@settings/aiFeedPersonalization',
-  AI_CONVERSATION_HISTORY: '@settings/aiConversationHistory',
   PUSH_NOTIFICATIONS: '@settings/pushNotifications',
   CHAT_NOTIFICATIONS: '@settings/chatNotifications',
   EVENT_REMINDERS: '@settings/eventReminders',
@@ -58,20 +55,9 @@ type SettingsNavProp = NativeStackNavigationProp<ProfileStackParamList, 'Setting
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface SettingsState {
   locationSharing: boolean;
-  aiPetAssistant: boolean;
-  aiCaptionGenerator: boolean;
-  aiFeedPersonalization: boolean;
-  aiConversationHistory: boolean;
   pushNotifications: boolean;
   chatNotifications: boolean;
   eventReminders: boolean;
-}
-
-interface AIUsageData {
-  requestsThisMonth: number;
-  requestsLimit: number;
-  featuresUsed: number;
-  lastRequestDate: string | null;
 }
 
 interface Pet {
@@ -86,6 +72,7 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsNavProp>();
   const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
+  const location = useLocation();
 
   // ─── Fetch User's Pets ────────────────────────────────────────────────────
   const { data: pets = [], isLoading: petsLoading } = useQuery<Pet[]>({
@@ -97,34 +84,9 @@ const SettingsScreen: React.FC = () => {
   const petCount = pets?.length || 0;
   const petNames = pets?.slice(0, 2).map((p: Pet) => p.name).join(', ') || 'No pets yet';
 
-  // ─── Fetch AI Usage Stats ─────────────────────────────────────────────────
-  const { data: aiUsage } = useQuery<AIUsageData>({
-    queryKey: ['aiUsage', user?.id],
-    queryFn: async () => {
-      try {
-        const { data } = await api.get<{ data: AIUsageData }>('/ai/usage');
-        return data.data;
-      } catch (error) {
-        // Return default data if API fails
-        return {
-          requestsThisMonth: 0,
-          requestsLimit: 500,
-          featuresUsed: 0,
-          lastRequestDate: null,
-        };
-      }
-    },
-    staleTime: 60000, // 1 minute
-    enabled: !!user?.id,
-  });
-
   // ─── Settings State ───────────────────────────────────────────────────────
   const [settings, setSettings] = useState<SettingsState>({
     locationSharing: true,
-    aiPetAssistant: true,
-    aiCaptionGenerator: true,
-    aiFeedPersonalization: false,
-    aiConversationHistory: true,
     pushNotifications: true,
     chatNotifications: true,
     eventReminders: true,
@@ -180,6 +142,21 @@ const SettingsScreen: React.FC = () => {
     setSettings(prev => ({ ...prev, [key]: value }));
     await saveSetting(storageKey, value);
 
+    if (key === 'locationSharing') {
+      if (value) {
+        // Turning ON location sharing
+        location.startBackgroundTracking();
+      } else {
+        // Turning OFF location sharing
+        location.stopBackgroundTracking();
+        try {
+          await api.delete('/map/location');
+        } catch (error) {
+          console.warn('Failed to delete location from server:', error);
+        }
+      }
+    }
+
     // Sync with backend for critical settings
     if (['locationSharing', 'pushNotifications'].includes(key)) {
       try {
@@ -230,21 +207,26 @@ const SettingsScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            // Require additional confirmation
+          onPress: async () => {
+            // For now, show contact information since the API isn't implemented yet
             Alert.alert(
-              'Are you absolutely sure?',
-              'Type DELETE to confirm account deletion.',
+              'Account Deletion Request',
+              'To delete your account, please contact support@pawspace.app with your username and email. We\'ll process your request within 24 hours.\n\nThis will be automated in a future update.',
               [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Confirm',
-                  style: 'destructive',
-                  onPress: async () => {
-                    // TODO: Implement account deletion API
-                    Alert.alert('Feature Coming Soon', 'Account deletion will be available in the next update.');
-                  },
-                },
+                { 
+                  text: 'OK',
+                  onPress: () => {
+                    // Optionally allow them to sign out
+                    Alert.alert(
+                      'Sign Out',
+                      'Would you like to sign out for now?',
+                      [
+                        { text: 'No', style: 'cancel' },
+                        { text: 'Sign Out', onPress: handleSignOut }
+                      ]
+                    );
+                  }
+                }
               ]
             );
           },
@@ -263,17 +245,6 @@ const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('Share error:', error);
     }
-  };
-
-  const handleAIUsage = () => {
-    const usage = aiUsage || { requestsThisMonth: 0, requestsLimit: 500, featuresUsed: 0 };
-    const percentage = ((usage.requestsThisMonth / usage.requestsLimit) * 100).toFixed(1);
-    
-    Alert.alert(
-      'AI Usage & Limits',
-      `You have used ${usage.requestsThisMonth} out of ${usage.requestsLimit} monthly AI requests (${percentage}%).\n\nFeatures used: ${usage.featuresUsed}\n\nYour limit resets on the 1st of each month.`,
-      [{ text: 'Got it' }]
-    );
   };
 
   const handleHelpCenter = async () => {
@@ -376,12 +347,6 @@ const SettingsScreen: React.FC = () => {
 
   const renderSectionDivider = () => <View style={styles.divider} />;
 
-  // Calculate AI usage percentage
-  const aiUsagePercentage = aiUsage 
-    ? Math.round((aiUsage.requestsThisMonth / aiUsage.requestsLimit) * 100)
-    : 0;
-  const aiUsageColor = aiUsagePercentage > 90 ? COLORS.error : aiUsagePercentage > 70 ? COLORS.warning : COLORS.primary;
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" />
@@ -426,24 +391,7 @@ const SettingsScreen: React.FC = () => {
           <Icon name="chevron-forward" size={20} color="#6B7280" />
         </View>
 
-        {/* AI Usage Banner */}
-        <TouchableOpacity style={styles.aiUsageBanner} onPress={handleAIUsage}>
-          <View style={styles.aiBannerLeft}>
-            <View style={styles.aiIconSquare}>
-              <MaterialCommunityIcons name="robot" size={20} color={aiUsageColor} />
-            </View>
-            <View>
-              <Text style={[styles.aiUsageLabel, { color: aiUsageColor }]}>AI usage this month</Text>
-              <Text style={styles.aiUsageSubtext}>
-                {aiUsage?.requestsThisMonth || 0} / {aiUsage?.requestsLimit || 500} requests · {aiUsage?.featuresUsed || 0} features
-              </Text>
-            </View>
-          </View>
-          <View style={styles.aiUsageRight}>
-            <Text style={[styles.aiUsagePercent, { color: aiUsageColor }]}>{aiUsagePercentage}%</Text>
-            <Icon name="chevron-forward" size={20} color={aiUsageColor} />
-          </View>
-        </TouchableOpacity>
+
 
         {/* Account Section */}
         <Text style={styles.sectionLabel}>ACCOUNT</Text>
@@ -469,7 +417,7 @@ const SettingsScreen: React.FC = () => {
             undefined,
             undefined,
             undefined,
-            () => Alert.alert('Coming Soon', 'Password & security screen coming soon')
+            () => navigation.navigate('PasswordSecurity' as any)
           )}
           {renderSectionDivider()}
           {renderSettingRow(
@@ -481,7 +429,19 @@ const SettingsScreen: React.FC = () => {
             undefined,
             undefined,
             undefined,
-            () => Alert.alert('Coming Soon', 'Privacy settings coming soon')
+            () => navigation.navigate('PrivacySettings' as any)
+          )}
+          {renderSectionDivider()}
+          {renderSettingRow(
+            'ban-outline',
+            'rgba(239,68,68,0.2)',
+            'Blocked users',
+            'Manage blocked accounts',
+            'chevron',
+            undefined,
+            undefined,
+            undefined,
+            () => navigation.navigate('BlockedUsers' as any)
           )}
           {renderSectionDivider()}
           {renderSettingRow(
@@ -493,7 +453,7 @@ const SettingsScreen: React.FC = () => {
             undefined,
             undefined,
             '1 linked',
-            () => Alert.alert('Coming Soon', 'Linked accounts screen coming soon')
+            () => navigation.navigate('LinkedAccounts' as any)
           )}
         </View>
 
@@ -521,69 +481,6 @@ const SettingsScreen: React.FC = () => {
             'toggle',
             settings.locationSharing,
             (val) => updateSetting('locationSharing', val, SETTINGS_KEYS.LOCATION_SHARING)
-          )}
-        </View>
-
-        {/* AI Features Section */}
-        <Text style={styles.sectionLabel}>AI FEATURES</Text>
-        <View style={styles.section}>
-          {renderSettingRow(
-            'sparkles',
-            'rgba(124,58,237,0.2)',
-            'AI pet assistant',
-            'Groq · Llama 3.1 70B',
-            'toggle',
-            settings.aiPetAssistant,
-            (val) => updateSetting('aiPetAssistant', val, SETTINGS_KEYS.AI_PET_ASSISTANT),
-            undefined,
-            undefined,
-            'MaterialCommunityIcons'
-          )}
-          {renderSectionDivider()}
-          {renderSettingRow(
-            'text',
-            'rgba(124,58,237,0.2)',
-            'AI caption generator',
-            'Auto-suggest captions',
-            'toggle',
-            settings.aiCaptionGenerator,
-            (val) => updateSetting('aiCaptionGenerator', val, SETTINGS_KEYS.AI_CAPTION_GENERATOR),
-            undefined,
-            undefined,
-            'MaterialCommunityIcons'
-          )}
-          {renderSectionDivider()}
-          {renderSettingRow(
-            'trending-up',
-            'rgba(124,58,237,0.2)',
-            'AI feed personalization',
-            'Personalized content',
-            'toggle',
-            settings.aiFeedPersonalization,
-            (val) => updateSetting('aiFeedPersonalization', val, SETTINGS_KEYS.AI_FEED_PERSONALIZATION)
-          )}
-          {renderSectionDivider()}
-          {renderSettingRow(
-            'time-outline',
-            'rgba(59,130,246,0.2)',
-            'AI conversation history',
-            'Save chat context per pet',
-            'toggle',
-            settings.aiConversationHistory,
-            (val) => updateSetting('aiConversationHistory', val, SETTINGS_KEYS.AI_CONVERSATION_HISTORY)
-          )}
-          {renderSectionDivider()}
-          {renderSettingRow(
-            'chart-bar-stacked',
-            'rgba(107,114,128,0.2)',
-            'AI usage & limits',
-            `${aiUsage?.requestsThisMonth || 0} / ${aiUsage?.requestsLimit || 500} requests`,
-            'chevron',
-            undefined,
-            undefined,
-            undefined,
-            handleAIUsage,
-            'MaterialCommunityIcons'
           )}
         </View>
 
@@ -625,7 +522,7 @@ const SettingsScreen: React.FC = () => {
         <Text style={styles.sectionLabel}>APPEARANCE</Text>
         <View style={styles.section}>
           {renderSettingRow(
-            'moon',
+            'weather-night',
             'rgba(107,114,128,0.2)',
             'Theme',
             'Dark',
@@ -633,7 +530,7 @@ const SettingsScreen: React.FC = () => {
             undefined,
             undefined,
             undefined,
-            () => Alert.alert('Theme', 'Theme customization coming soon'),
+            () => navigation.navigate('ThemeSettings' as any),
             'MaterialCommunityIcons'
           )}
           {renderSectionDivider()}
@@ -646,7 +543,7 @@ const SettingsScreen: React.FC = () => {
             undefined,
             undefined,
             undefined,
-            () => Alert.alert('Language', 'Language selection coming soon'),
+            () => navigation.navigate('LanguageSettings' as any),
             'MaterialCommunityIcons'
           )}
         </View>
@@ -839,49 +736,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '600',
     marginLeft: 4,
-  },
-  aiUsageBanner: {
-    backgroundColor: 'rgba(124,58,237,0.12)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(124,58,237,0.5)',
-    borderRadius: 16,
-    padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
-  },
-  aiBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  aiIconSquare: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(124,58,237,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  aiUsageLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  aiUsageSubtext: {
-    fontSize: 12,
-    color: 'rgba(124,58,237,0.7)',
-  },
-  aiUsageRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aiUsagePercent: {
-    fontSize: 16,
-    fontWeight: '700',
   },
   sectionLabel: {
     fontSize: 11,

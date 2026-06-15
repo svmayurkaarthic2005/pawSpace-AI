@@ -54,66 +54,46 @@ export async function getPlaceAutocomplete(
 ): Promise<PlaceAutocompleteResult[]> {
   try {
     const params: any = {
-      input: query,
+      query: query,
       key: GOOGLE_MAPS_API_KEY,
     };
 
     if (proximity) {
       params.location = `${proximity.lat},${proximity.lng}`;
-      params.radius = 50000; // 50km radius
+      params.radius = 50000; // 50km bias
     }
 
-    const response = await axios.get('https://maps.googleapis.com/maps/api/place/autocomplete/json', {
+    console.log(`[Backend] Geocode Request: textsearch for query="${query}"`);
+
+    const response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
       params,
     });
 
-    if (response.data.status === 'OK' && response.data.predictions) {
-      // Get place details for each prediction to retrieve coordinates
-      const results = await Promise.all(
-        response.data.predictions.slice(0, 5).map(async (prediction: any) => {
-          const details = await getPlaceDetails(prediction.place_id);
-          return {
-            placeId: prediction.place_id,
-            name: prediction.structured_formatting?.main_text || prediction.description,
-            address: prediction.description,
-            lat: details?.lat || 0,
-            lng: details?.lng || 0,
-          };
-        })
-      );
-      return results.filter((r) => r.lat !== 0 && r.lng !== 0);
+    console.log(`[Backend] Google API Status: ${response.data.status}`);
+    
+    if (response.data.error_message) {
+      console.error(`[Backend] Google API Error: ${response.data.error_message}`);
+    }
+
+    if (response.data.status === 'OK' && response.data.results) {
+      const results = response.data.results.slice(0, 5).map((place: any) => ({
+        placeId: place.place_id,
+        name: place.name,
+        address: place.formatted_address,
+        lat: place.geometry?.location?.lat || 0,
+        lng: place.geometry?.location?.lng || 0,
+      }));
+      
+      return results.filter((r: any) => r.lat !== 0 && r.lng !== 0);
     }
 
     return [];
-  } catch (error) {
-    console.error('Autocomplete error:', error);
+  } catch (error: any) {
+    console.error('[Backend] Autocomplete error:', error?.response?.data || error.message);
     return [];
   }
 }
 
-async function getPlaceDetails(placeId: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const response = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
-      params: {
-        place_id: placeId,
-        fields: 'geometry',
-        key: GOOGLE_MAPS_API_KEY,
-      },
-    });
-
-    if (response.data.status === 'OK' && response.data.result?.geometry?.location) {
-      return {
-        lat: response.data.result.geometry.location.lat,
-        lng: response.data.result.geometry.location.lng,
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Place details error:', error);
-    return null;
-  }
-}
 
 export async function getDirections(
   origin: { lat: number; lng: number },

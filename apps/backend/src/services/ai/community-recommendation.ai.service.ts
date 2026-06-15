@@ -1,4 +1,4 @@
-import Groq from 'groq-sdk';
+import { GoogleGenAI } from '@google/genai';
 import { env } from '../../config/env';
 import { Community } from '../../models/community.model';
 import { Pet } from '../../models/pet.model';
@@ -6,10 +6,10 @@ import { CommunityMembership } from '../../models/communityMembership.model';
 import { redis } from '../../config/redis';
 import mongoose from 'mongoose';
 
-const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 
 class CommunityRecommendationAIService {
-  private readonly model = 'llama3-8b-8192';
+  private readonly model = 'gemini-2.5-flash';
   private readonly cacheKeyPrefix = 'communities:recommended:';
   private readonly cacheTTL = 3600; // 1 hour
 
@@ -41,25 +41,20 @@ class CommunityRecommendationAIService {
       // Prepare prompt
       const prompt = this.buildPrompt(userContext, availableCommunities);
 
-      // Call Groq AI
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are an AI that recommends pet communities. Analyze user pets and community data to suggest the most relevant communities. Return ONLY a JSON array of community IDs ordered by relevance.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+      // Call Gemini AI
+      const response = await ai.models.generateContent({
         model: this.model,
-        temperature: 0.7,
-        max_tokens: 500,
+        contents: [
+          { role: 'user', parts: [{ text: prompt }] }
+        ],
+        config: {
+          systemInstruction: { parts: [{ text: 'You are an AI that recommends pet communities. Analyze user pets and community data to suggest the most relevant communities. Return ONLY a JSON array of community IDs ordered by relevance.' }] },
+          temperature: 0.7,
+          maxOutputTokens: 500,
+        }
       });
 
-      const responseText = completion.choices[0]?.message?.content?.trim() || '[]';
+      const responseText = response.text?.trim() || '[]';
       
       // Parse AI response
       const recommendedIds = this.parseAIResponse(responseText, availableCommunities);

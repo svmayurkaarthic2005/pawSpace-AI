@@ -175,13 +175,26 @@ const EditProfileScreen: React.FC = () => {
   const handleChangePhoto = async () => {
     try {
       const result = await launchImageLibrary({
-        mediaType: 'photo',
+        mediaType: 'mixed',
         quality: 0.8,
+        videoQuality: 'high',
         selectionLimit: 1,
       });
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+        
         setAvatarUri(asset.uri);
         setNewAvatarFile({
           uri: asset.uri!,
@@ -198,13 +211,26 @@ const EditProfileScreen: React.FC = () => {
   const handleChangeCover = async () => {
     try {
       const result = await launchImageLibrary({
-        mediaType: 'photo',
+        mediaType: 'mixed',
         quality: 0.8,
+        videoQuality: 'high',
         selectionLimit: 1,
       });
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+        
         setCoverImageUri(asset.uri);
         setNewCoverFile({
           uri: asset.uri!,

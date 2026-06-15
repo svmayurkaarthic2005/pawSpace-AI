@@ -49,7 +49,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     }
 
     // Don't search for empty or very short input
-    if (!value || value.length < 2) {
+    if (!value || typeof value !== 'string' || value.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       setIsLoading(false);
@@ -82,13 +82,16 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       
       // Only update state if this is still the most recent request
       if (requestId === currentRequestId) {
+        // Ensure results is always an array
+        const safeResults = Array.isArray(results) ? results : [];
+        
         // Batch state updates to prevent race condition
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
+        setSuggestions(safeResults);
+        setShowSuggestions(safeResults.length > 0);
         setIsLoading(false);
         
         // Show message if no results found
-        if (results.length === 0 && query.length >= 2) {
+        if (safeResults.length === 0 && query.length >= 2) {
           setError('No locations found. Try a different search.');
         }
       }
@@ -118,7 +121,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     onChangeText(text);
     setError(null);
     // Don't show suggestions if clearing
-    if (text.length < 2) {
+    if (!text || typeof text !== 'string' || text.length < 2) {
       setShowSuggestions(false);
       setSuggestions([]);
     }
@@ -133,7 +136,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
 
   // Memoize the suggestions list to prevent unnecessary re-renders
   const suggestionsList = useMemo(() => {
-    if (!showSuggestions || suggestions.length === 0) {
+    if (!showSuggestions || !suggestions || suggestions.length === 0) {
       return null;
     }
 
@@ -166,7 +169,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         <Icon name="location-outline" size={20} color={subColor} />
         <TextInput
           style={[styles.input, inputStyle, { color: textColor }]}
-          value={value}
+          value={value || ''}
           onChangeText={handleChangeText}
           placeholder={placeholder}
           placeholderTextColor={subColor}
@@ -175,7 +178,7 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
         {isLoading && (
           <ActivityIndicator size="small" color={COLORS.primary} />
         )}
-        {value.length > 0 && !isLoading && (
+        {value && value.length > 0 && !isLoading && (
           <TouchableOpacity onPress={handleClear}>
             <Icon name="close-circle" size={20} color={subColor} />
           </TouchableOpacity>
@@ -200,6 +203,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 8,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,

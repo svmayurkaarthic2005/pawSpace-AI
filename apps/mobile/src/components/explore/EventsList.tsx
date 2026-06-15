@@ -26,11 +26,7 @@ export const EventsList: React.FC<EventsListProps> = ({ events }) => {
   };
 
   return (
-    <ScrollView
-      horizontal={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-    >
+    <View style={styles.container}>
       {events.map((event) => (
         <TouchableOpacity
           key={event.id}
@@ -78,7 +74,7 @@ export const EventsList: React.FC<EventsListProps> = ({ events }) => {
           </View>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 

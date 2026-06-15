@@ -17,7 +17,7 @@ export const chatApi = {
     chatId: string,
     cursor?: string,
     limit = 30,
-  ): Promise<{ items: SerializedMessage[]; nextCursor: string | null; hasMore: boolean }> {
+  ): Promise<{ messages: SerializedMessage[]; items?: SerializedMessage[]; nextCursor: string | null; hasMore: boolean }> {
     const params: Record<string, string> = { limit: String(limit) };
     if (cursor) params.cursor = cursor;
     const { data } = await api.get(`/chats/${chatId}/messages`, { params });

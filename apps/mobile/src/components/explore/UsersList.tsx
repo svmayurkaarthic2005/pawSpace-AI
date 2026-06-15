@@ -1,35 +1,59 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { UserProfile, NearbyUser } from '../../types';
+import { followApi } from '../../services/post.service';
 
 interface UsersListProps {
   users: (UserProfile | NearbyUser)[];
 }
 
-const isNearbyUser = (user: UserProfile | NearbyUser): user is NearbyUser => {
-  return 'distance' in user;
+const isNearbyUser = (user: UserProfile | NearbyUser | null | undefined): user is NearbyUser => {
+  return !!user && typeof user === 'object' && 'distance' in (user as any);
 };
 
 export const UsersList: React.FC<UsersListProps> = ({ users }) => {
   const navigation = useNavigation();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [followStatuses, setFollowStatuses] = useState<Record<string, 'requested' | 'following'>>({});
 
   const handleUserPress = (userId: string) => {
-    navigation.navigate('Profile' as never, { userId } as never);
+    (navigation as any).push('Profile', { userId });
+  };
+
+  const handleFollow = async (userId: string, userName: string) => {
+    try {
+      setLoadingId(userId);
+      const res = await followApi.toggleFollow(userId);
+      if (res.requested) {
+        setFollowStatuses((prev) => ({ ...prev, [userId]: 'requested' }));
+        Alert.alert('Requested', `Follow request sent to ${userName}`);
+      } else if (res.following) {
+        setFollowStatuses((prev) => ({ ...prev, [userId]: 'following' }));
+        Alert.alert('Followed!', `You are now following ${userName}`);
+      } else {
+        setFollowStatuses((prev) => {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Follow error:', error);
+      Alert.alert('Error', 'Failed to update follow status');
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
-    <ScrollView
-      horizontal={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-    >
-      {users.map((user) => (
+    <View style={styles.container}>
+      {users.map((user: any) => (
         <TouchableOpacity
-          key={user.id}
+          key={user._id || user.id}
           style={styles.card}
-          onPress={() => handleUserPress(user.id)}
+          onPress={() => handleUserPress(user._id || user.id)}
           activeOpacity={0.8}
         >
           {/* Avatar */}
@@ -90,12 +114,28 @@ export const UsersList: React.FC<UsersListProps> = ({ users }) => {
           </View>
 
           {/* Follow Button */}
-          <TouchableOpacity style={styles.followButton}>
-            <Icon name="person-add-outline" size={18} color="#7C3AED" />
+          <TouchableOpacity 
+            style={[
+              styles.followButton,
+              followStatuses[user._id || user.id] === 'following' && styles.followingButton,
+              followStatuses[user._id || user.id] === 'requested' && styles.requestedButton
+            ]}
+            onPress={() => handleFollow(user._id || user.id, user.name || user.username)}
+            disabled={loadingId === (user._id || user.id)}
+          >
+            {loadingId === (user._id || user.id) ? (
+              <ActivityIndicator size="small" color="#7C3AED" />
+            ) : followStatuses[user._id || user.id] === 'requested' ? (
+              <Icon name="time-outline" size={18} color="#F59E0B" />
+            ) : followStatuses[user._id || user.id] === 'following' ? (
+              <Icon name="person-remove-outline" size={18} color="#10B981" />
+            ) : (
+              <Icon name="person-add-outline" size={18} color="#7C3AED" />
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -200,5 +240,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.3)',
     marginLeft: 12,
+  },
+  followingButton: {
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderColor: 'rgba(16,185,129,0.3)',
+  },
+  requestedButton: {
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderColor: 'rgba(245,158,11,0.3)',
   },
 });

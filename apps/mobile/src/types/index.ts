@@ -200,7 +200,9 @@ export type FeedStackParamList = {
   FeedHome: undefined;
   PostDetail: { postId: string };
   PetProfile: { petId: string };
+  EditPet: { petId: string };
   Profile: { userId: string };
+  FollowersList: { userId: string; type: 'followers' | 'following' };
   ChatRoom: { conversationId: string; recipientName: string };
   NewChat: undefined;
   PetAssistant: { petId?: string } | undefined;
@@ -220,23 +222,33 @@ export type ExploreStackParamList = {
   EditCommunity: { communityId: string };
   SmartSearch: undefined;
   Profile: { userId: string };
+  FollowersList: { userId: string; type: 'followers' | 'following' };
   EventDetail: { eventId: string };
   HashtagFeed: { hashtag: string };
+  ChatRoom: { conversationId: string; recipientName: string };
 };
 
 export type EventsStackParamList = {
   MapDiscovery: undefined;
   EventDetail: { eventId: string };
+  CreateEvent: undefined;
 };
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   PetProfile: { petId: string };
+  EditPet: { petId: string };
   EditProfile: undefined;
   Settings: undefined;
   AddPet: undefined;
   FollowersList: { userId: string; type: 'followers' | 'following' };
   ChatRoom: { conversationId: string; recipientName: string };
+  PasswordSecurity: undefined;
+  PrivacySettings: undefined;
+  LinkedAccounts: undefined;
+  ThemeSettings: undefined;
+  LanguageSettings: undefined;
+  BlockedUsers: undefined;
 };
 
 // ─── API Types ────────────────────────────────────────────────────────────────

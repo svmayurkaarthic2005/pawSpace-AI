@@ -79,7 +79,7 @@ export class PostService {
     // Invalidate own feed + all followers' feeds
     await Promise.all([
       cacheService.invalidateFeed(userId),
-      cacheService.invalidateFollowerFeeds(userId),
+      cacheService.invalidateFollowerFeeds(userId, 'User'),
     ]);
 
     return post;
@@ -87,14 +87,16 @@ export class PostService {
 
   /**
    * Get paginated feed. Checks Redis cache first (5 min TTL).
+   * Includes posts from followed users AND followed pets.
    */
   async getFeed(
     userId: string,
     cursor?: string,
     limit: number = 20,
+    blockedIds: string[] = []
   ): Promise<{ items: IPost[]; nextCursor: string | null; hasMore: boolean }> {
     // Only cache the first page (no cursor)
-    if (!cursor) {
+    if (!cursor && blockedIds.length === 0) {
       const cached = await cacheService.getFeed(userId);
       if (cached) {
         const parsed = JSON.parse(cached) as {
@@ -106,11 +108,24 @@ export class PostService {
       }
     }
 
-    const followingIds = await followRepository.getFollowingIds(userId);
-    const result = await postRepository.getFeed(userId, followingIds, limit, cursor);
+    // Get separate lists of followed users and followed pets
+    const [followedUserIds, followedPetIds] = await Promise.all([
+      followRepository.getFollowingIdsByType(userId, 'User'),
+      followRepository.getFollowingIdsByType(userId, 'Pet'),
+    ]);
 
-    // Cache only the first page
-    if (!cursor) {
+    // Query posts from followed users and followed pets
+    const result = await postRepository.getFeed(
+      userId, 
+      followedUserIds, 
+      followedPetIds, 
+      limit,
+      cursor,
+      blockedIds
+    );
+
+    // Cache only the first page (if no blocked users filtering is actively mutating the generic feed)
+    if (!cursor && blockedIds.length === 0) {
       await cacheService.setFeed(userId, [result], 300);
     }
 
@@ -227,7 +242,7 @@ export class PostService {
     // Invalidate caches
     await Promise.all([
       cacheService.invalidateFeed(userId),
-      cacheService.invalidateFollowerFeeds(userId),
+      cacheService.invalidateFollowerFeeds(userId, 'User'),
     ]);
   }
 
@@ -243,8 +258,8 @@ export class PostService {
     return { ...post.toObject(), isLiked };
   }
 
-  async getExplorePosts(page: number, limit: number) {
-    return postRepository.getExplorePosts(page, limit);
+  async getExplorePosts(page: number, limit: number, blockedIds: string[] = []) {
+    return postRepository.getExplorePosts(page, limit, blockedIds);
   }
 
   async getPostsByUser(userId: string, page: number, limit: number) {

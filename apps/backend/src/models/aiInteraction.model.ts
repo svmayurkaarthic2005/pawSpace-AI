@@ -59,7 +59,7 @@ const aiInteractionSchema = new Schema<IAIInteraction, IAIInteractionModel>(
     modelName: {
       type: String,
       required: [true, 'Model name is required'],
-      default: 'llama3-8b-8192',
+      default: 'llama-3.1-8b-instant',
     },
     tokensUsed: {
       type: Number,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { MapView, Polyline, PROVIDER_GOOGLE, mapModuleError, MapErrorFallback } from './MapWrapper';
@@ -59,6 +59,8 @@ interface GoogleMapProps {
   mapRef: React.RefObject<any>;
   routeCoordinates: Array<{ latitude: number; longitude: number }> | null;
   showRoute: boolean;
+  isFollowingUser: boolean;
+  onUserInteraction: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
 }
@@ -80,10 +82,33 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
   mapRef,
   routeCoordinates,
   showRoute,
+  isFollowingUser,
+  onUserInteraction,
   onZoomIn,
   onZoomOut,
 }) => {
   const zoomingRef = useRef(false); // Prevent concurrent zoom operations
+  const prevCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    if (!location.coords) return;
+    
+    if (!prevCoordsRef.current || isFollowingUser) {
+      if (mapRef.current) {
+        mapRef.current.getCamera().then((camera: any) => {
+          if (!mapRef.current) return;
+          mapRef.current.animateCamera(
+            {
+              center: { latitude: location.coords!.latitude, longitude: location.coords!.longitude },
+              zoom: camera.zoom || 13,
+            },
+            { duration: 1000 }
+          );
+        }).catch((err: any) => console.warn('Failed to get camera:', err));
+      }
+    }
+    prevCoordsRef.current = location.coords;
+  }, [location.coords, mapRef, isFollowingUser]);
 
   // Show error fallback if maps module failed to load
   if (mapModuleError || !MapView) {
@@ -178,6 +203,14 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
         rotateEnabled={false}
         zoomEnabled={true}
         zoomControlEnabled={false}
+        onPanDrag={() => {
+          if (isFollowingUser) onUserInteraction();
+        }}
+        onRegionChangeComplete={(region, details) => {
+          if (details?.isGesture && isFollowingUser) {
+            onUserInteraction();
+          }
+        }}
         onPress={() => {
           if (selectedMarker) onDeselectMarker();
         }}

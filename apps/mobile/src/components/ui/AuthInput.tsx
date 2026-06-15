@@ -18,7 +18,7 @@ interface AuthInputProps extends TextInputProps {
 }
 
 const AuthInput = forwardRef<TextInput, AuthInputProps>(
-  ({ label, error, containerStyle, leftElement, rightElement, ...props }, ref) => {
+  ({ label, error, containerStyle, leftElement, rightElement, style, ...props }, ref) => {
     return (
       <View style={[styles.container, containerStyle]}>
         <Text style={styles.label}>{label}</Text>
@@ -26,7 +26,7 @@ const AuthInput = forwardRef<TextInput, AuthInputProps>(
           {leftElement && <View style={styles.leftElement}>{leftElement}</View>}
           <TextInput
             ref={ref}
-            style={styles.input}
+            style={[styles.input, style]}
             placeholderTextColor="rgba(255,255,255,0.5)"
             autoCapitalize="none"
             autoCorrect={false}

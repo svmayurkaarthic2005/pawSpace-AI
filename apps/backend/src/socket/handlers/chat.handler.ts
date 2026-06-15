@@ -147,6 +147,20 @@ export const registerChatHandlers = (
               isRead: false,
               createdAt: new Date().toISOString(),
             });
+            
+            // Push Notification
+            try {
+              const { fcmService } = await import('../../services/fcm.service');
+              fcmService.sendToUser(recipientId, {
+                type: 'new_message',
+                chatId,
+                userId,
+                senderName: (socket.user as any).username ?? socket.user.email?.split('@')[0] ?? 'Someone',
+                messagePreview: content.text?.slice(0, 50) ?? (content.type === 'image' ? 'Sent an image' : 'Sent a message'),
+              });
+            } catch (err) {
+              console.error('[chat:send] FCM error:', err);
+            }
           }
         }
       }

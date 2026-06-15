@@ -243,7 +243,13 @@ async function getNearbyUsers(userId: string): Promise<any[]> {
 
   // Get users the current user is already following
   const followingIds = await followRepository.getFollowingIds(userId);
-  const excludeIds = [...followingIds, userId].map((id) => new mongoose.Types.ObjectId(id));
+  
+  // Get users the current user has requested to follow
+  const { Follow } = await import('../models/follow.model');
+  const pendingFollows = await Follow.find({ follower: userId, entityType: 'User', status: 'pending' }).select('following').lean().exec();
+  const pendingIds = pendingFollows.map((f: any) => f.following.toString());
+
+  const excludeIds = [...followingIds, ...pendingIds, userId].map((id) => new mongoose.Types.ObjectId(id));
 
   // Find nearby users
   const nearbyLocations = await UserLocation.aggregate([

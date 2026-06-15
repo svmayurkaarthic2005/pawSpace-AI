@@ -35,6 +35,7 @@ export interface IUser extends Document {
   petCount: number;
   role: 'user' | 'admin';
   isProfileComplete: boolean; // Tracks if user completed profile setup
+  isPrivate: boolean;
   settings?: {
     locationSharing?: boolean;
     pushNotifications?: boolean;
@@ -66,6 +67,7 @@ export interface PublicUser {
   petCount: number;
   role: 'user' | 'admin';
   isProfileComplete: boolean;
+  isPrivate: boolean;
   createdAt: Date;
 }
 
@@ -182,11 +184,13 @@ const userSchema = new Schema<IUser, IUserModel>(
       type: Number,
       default: 0,
       min: 0,
+      // Number of users following this user
     },
     followingCount: {
       type: Number,
       default: 0,
       min: 0,
+      // Total number of entities (users + pets) this user follows
     },
     petCount: {
       type: Number,
@@ -199,6 +203,10 @@ const userSchema = new Schema<IUser, IUserModel>(
       default: 'user',
     },
     isProfileComplete: {
+      type: Boolean,
+      default: false,
+    },
+    isPrivate: {
       type: Boolean,
       default: false,
     },
@@ -273,6 +281,7 @@ userSchema.methods.toPublicJSON = function (): PublicUser {
     petCount: this.petCount as number,
     role: this.role as 'user' | 'admin',
     isProfileComplete: this.isProfileComplete as boolean,
+    isPrivate: this.isPrivate as boolean,
     createdAt: this.createdAt as Date,
   };
 };

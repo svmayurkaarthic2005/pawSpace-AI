@@ -1,6 +1,7 @@
 import { Response, NextFunction, Request } from 'express';
 import { User } from '../models/user.model';
 import { Follow } from '../models/follow.model';
+import { Block } from '../models/block.model';
 import { successResponse, errorResponse } from '../utils';
 import { uploadImage } from '../utils/cloudinary.util';
 
@@ -45,17 +46,25 @@ export const getUserProfile = async (
 
     // Check if current user follows this user (if authenticated)
     let isFollowing = false;
+    let isBlocked = false;
     if (req.user) {
       const follow = await Follow.findOne({
         follower: req.user.userId,
         following: id,
       });
       isFollowing = !!follow;
+      
+      const block = await Block.findOne({
+        blocker: req.user.userId,
+        blocked: id,
+      });
+      isBlocked = !!block;
     }
 
     const profile = {
       ...user.toPublicJSON(),
       isFollowing,
+      isBlocked,
     };
 
     res.json(successResponse(profile));

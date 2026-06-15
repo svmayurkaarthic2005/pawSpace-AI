@@ -26,7 +26,7 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
 
   // Groq AI
-  GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY is required'),
+  GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
 
   // Google Maps (optional in development, required in production)
   GOOGLE_MAPS_API_KEY: z.string().optional().default(''),

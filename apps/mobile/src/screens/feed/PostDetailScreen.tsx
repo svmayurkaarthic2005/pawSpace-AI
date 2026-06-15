@@ -10,7 +10,7 @@ type PostDetailNavProp = NativeStackNavigationProp<FeedStackParamList, 'PostDeta
 const PostDetailScreen: React.FC = () => {
   const navigation = useNavigation<PostDetailNavProp>();
   const route = useRoute<PostDetailRouteProp>();
-  const { postId } = route.params;
+  const { postId } = (route.params ?? {}) as any;
 
   return (
     <View style={styles.container}>

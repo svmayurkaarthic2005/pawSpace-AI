@@ -1,7 +1,7 @@
 buildscript {
     ext {
         buildToolsVersion = "34.0.0"
-        minSdkVersion = 23
+        minSdkVersion = 24
         compileSdkVersion = 35
         targetSdkVersion = 34
         ndkVersion = "25.1.8937393"
@@ -25,6 +25,11 @@ allprojects {
         google()
         mavenCentral()
     }
+}
+
+// Configure react-native-screens for monorepo
+rootProject.ext {
+    reactNativeDir = file("../../../node_modules/react-native")
 }
 
 // Notice how 'apply plugin: "com.facebook.react.rootproject"' is GONE!

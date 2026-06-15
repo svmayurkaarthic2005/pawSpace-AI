@@ -10,7 +10,7 @@ type CommunityDetailNavProp = NativeStackNavigationProp<ExploreStackParamList, '
 const CommunityDetailScreen: React.FC = () => {
   const navigation = useNavigation<CommunityDetailNavProp>();
   const route = useRoute<CommunityDetailRouteProp>();
-  const { communityId } = route.params;
+  const { communityId } = (route.params ?? {}) as any;
 
   return (
     <View style={styles.container}>

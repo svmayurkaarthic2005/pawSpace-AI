@@ -14,7 +14,7 @@ export const healthCheck = async (_req: Request, res: Response): Promise<void> =
       googleMaps: env.GOOGLE_MAPS_API_KEY && env.GOOGLE_MAPS_API_KEY.length > 20 ? 'configured' : 'not_configured',
       cloudinary: env.CLOUDINARY_API_KEY ? 'configured' : 'not_configured',
       firebase: env.FIREBASE_PROJECT_ID ? 'configured' : 'not_configured',
-      groq: env.GROQ_API_KEY ? 'configured' : 'not_configured',
+      groq: env.GEMINI_API_KEY ? 'configured' : 'not_configured',
     },
     warnings: [] as string[],
   };
@@ -66,10 +66,10 @@ export const configCheck = async (_req: Request, res: Response): Promise<void> =
         },
       },
       groq: {
-        configured: !!env.GROQ_API_KEY,
+        configured: !!env.GEMINI_API_KEY,
         features: {
-          aiAssistant: !!env.GROQ_API_KEY,
-          eventRecommendations: !!env.GROQ_API_KEY,
+          aiAssistant: !!env.GEMINI_API_KEY,
+          eventRecommendations: !!env.GEMINI_API_KEY,
         },
       },
     },

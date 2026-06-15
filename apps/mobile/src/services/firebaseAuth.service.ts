@@ -55,8 +55,14 @@ export const signInWithGoogle = async () => {
  */
 export const signOut = async () => {
   try {
-    await auth().signOut();
+    // Revoke Google OAuth grant to force account picker next time
+    try {
+      await GoogleSignin.revokeAccess();
+    } catch (e) {
+      console.warn('[FirebaseAuth] Google revokeAccess error (safe to ignore if not signed in):', e);
+    }
     await GoogleSignin.signOut();
+    await auth().signOut();
     console.log('[FirebaseAuth] User signed out');
   } catch (error) {
     console.error('[FirebaseAuth] Sign out error:', error);

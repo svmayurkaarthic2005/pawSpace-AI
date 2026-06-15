@@ -149,7 +149,7 @@ const MessageBubble: React.FC<BubbleProps> = ({ message, isMine, isDark, onLongP
 // ─── ChatRoomScreen ───────────────────────────────────────────────────────────
 
 const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { chatId, otherUser } = route.params as { chatId: string; otherUser: ChatParticipant };
+  const { chatId, otherUser } = (route.params ?? {}) as any;
   const isDark = useColorScheme() === 'dark';
   const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -181,7 +181,7 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   // Update messages when data changes
   useEffect(() => {
     if (data) {
-      const allMessages = data.pages.flatMap((p) => p.items);
+      const allMessages = data.pages.flatMap((p) => p.messages || p.items || []);
       setMessages(chatId, allMessages);
     }
   }, [data, chatId, setMessages]);
@@ -241,10 +241,34 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [inputText, isSending, chatId, currentUser, sendMessage, stopTyping]);
 
   const handlePickImage = useCallback(async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
-    if (result.assets?.[0]?.uri) {
-      const tempId = nanoid();
-      sendImageMessage(result.assets[0].uri, tempId);
+    try {
+      const result = await launchImageLibrary({ 
+        mediaType: 'mixed', 
+        quality: 0.8,
+        videoQuality: 'high',
+      });
+      
+      if (result.assets?.[0]) {
+        const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+        
+        if (asset.uri) {
+          const tempId = nanoid();
+          sendImageMessage(asset.uri, tempId);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking media:', error);
     }
   }, [sendImageMessage]);
 

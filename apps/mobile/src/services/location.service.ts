@@ -30,7 +30,11 @@ export const locationService = {
    * Get location autocomplete suggestions from Google Places API
    */
   async getPlaceSuggestions(input: string): Promise<PlacePrediction[]> {
-    if (!input || input.length < 2) {
+    // Normalize whitespace: collapse multiple spaces and trim edges.
+    // Double spaces in programmatic address strings cause ZERO_RESULTS.
+    const cleanInput = input.replace(/\s+/g, ' ').trim();
+
+    if (!cleanInput || cleanInput.length < 2) {
       return [];
     }
 
@@ -40,13 +44,13 @@ export const locationService = {
     }
 
     try {
-      console.log('🔍 Fetching place suggestions for:', input);
+      console.log('🔍 Fetching place suggestions for:', cleanInput);
       
       const response = await axios.get<AutocompleteResponse>(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json',
         {
           params: {
-            input,
+            input: cleanInput,
             key: GOOGLE_PLACES_API_KEY,
             types: '(cities)',
             language: 'en',

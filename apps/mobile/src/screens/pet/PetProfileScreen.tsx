@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  FlatList, Dimensions, ActivityIndicator, useColorScheme,
+  Dimensions, ActivityIndicator, useColorScheme, Alert, Share,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useQuery } from '@tanstack/react-query';
-import { petApi, postApi } from '../../services/post.service';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { petApi, followApi } from '../../services/post.service';
 import { useAuthStore } from '../../store/authStore';
-import { FONT_SIZE, SPACING } from '../../constants';
+import { FONT_SIZE, SPACING, QUERY_KEYS } from '../../constants';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_SIZE = (SCREEN_WIDTH - SPACING.xs * 2) / 3;
@@ -20,9 +22,10 @@ const SPECIES_EMOJI: Record<string, string> = {
 };
 
 const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { petId } = route.params as { petId: string };
+  const { petId } = (route.params ?? {}) as any;
   const isDark = useColorScheme() === 'dark';
   const currentUser = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'grid' | 'reels' | 'saved'>('grid');
 
   const { data: pet, isLoading: petLoading } = useQuery({
@@ -35,6 +38,175 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     queryFn: () => petApi.getPetPosts(petId),
     enabled: !!pet,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => petApi.deletePet(petId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.MY_PETS] });
+      Alert.alert('Success', 'Pet deleted successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to delete pet');
+    },
+  });
+
+  const followMutation = useMutation({
+    mutationFn: () => followApi.toggleFollow(petOwnerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+      Alert.alert('Success', pet?.isFollowing ? 'Unfollowed' : 'Followed successfully');
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to update follow status');
+    },
+  });
+
+  const addPhotoMutation = useMutation({
+    mutationFn: async (uri: string) => {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const formData = new FormData();
+      formData.append('image', {
+        uri,
+        type: blob.type || 'image/jpeg',
+        name: `pet_${Date.now()}.jpg`,
+      } as any);
+      return petApi.addPetPhoto(petId, formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pet', petId] });
+      queryClient.invalidateQueries({ queryKey: ['petPosts', petId] });
+      Alert.alert('Success', 'Photo added successfully');
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to add photo');
+    },
+  });
+
+  const handleChangeCoverPhoto = async () => {
+    if (!isOwner) return;
+    
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'mixed',
+        quality: 0.8,
+        videoQuality: 'high',
+        selectionLimit: 1,
+      });
+
+      if (result.assets?.[0]) {
+        const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+
+        if (asset.uri) {
+          addPhotoMutation.mutate(asset.uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking cover photo:', error);
+      Alert.alert('Error', 'Failed to pick photo');
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Pet',
+      `Are you sure you want to delete ${pet?.name}? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => deleteMutation.mutate()
+        }
+      ]
+    );
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${pet?.name} on PawSpace! 🐾`,
+        title: `${pet?.name}'s Profile`,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleAddPhoto = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'mixed',
+        quality: 0.8,
+        videoQuality: 'high',
+        selectionLimit: 1,
+      });
+
+      if (result.assets?.[0]) {
+        const asset = result.assets[0];
+        
+        // Validate video duration (max 59 seconds)
+        if (asset.type?.startsWith('video') && asset.duration) {
+          if (asset.duration > 59) {
+            Alert.alert(
+              'Video Too Long',
+              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
+            );
+            return;
+          }
+        }
+
+        if (asset.uri) {
+          addPhotoMutation.mutate(asset.uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking photo:', error);
+      Alert.alert('Error', 'Failed to pick photo');
+    }
+  };
+
+  const handleFollow = () => {
+    if (!petOwnerId) {
+      Alert.alert('Error', 'Cannot follow this pet');
+      return;
+    }
+    followMutation.mutate();
+  };
+
+  const handleMessage = () => {
+    if (!pet?.owner) return;
+    
+    const owner = pet.owner as any;
+    navigation.navigate('ChatRoom' as any, {
+      recipientId: owner._id || owner.id,
+      recipientName: owner.username,
+      recipientAvatar: owner.avatar,
+    });
+  };
+
+  const handleViewOwnerProfile = () => {
+    if (!pet?.owner) return;
+    
+    const owner = pet.owner as any;
+    const ownerId = owner._id || owner.id;
+    
+    // Navigate to the owner's profile
+    navigation.navigate('Profile' as any, { userId: ownerId });
+  };
 
   const bg = isDark ? '#080810' : '#F8F8FF';
   const cardBg = isDark ? '#1A1A2E' : '#FFFFFF';
@@ -58,7 +230,18 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   }
 
   const profileImage = pet.images?.find((i: any) => i.isProfile) ?? pet.images?.[0];
-  const isOwner = currentUser && pet.owner?._id === currentUser.id;
+  
+  // Check if current user is the owner - safely compare IDs
+  const petOwnerId = (pet.owner as any)?._id || (pet.owner as any)?.id;
+  const userId = (currentUser as any)?._id || currentUser?.id;
+  const isOwner = currentUser && petOwnerId === userId;
+  
+  console.log('[PetProfile] Owner check:', { 
+    currentUserId: userId,
+    petOwnerId,
+    isOwner 
+  });
+  
   const posts = postsData?.items ?? [];
 
   return (
@@ -66,32 +249,50 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Cover / Hero */}
         <View style={styles.hero}>
-          {profileImage ? (
-            <FastImage
-              source={{ uri: profileImage.url, priority: FastImage.priority.high }}
-              style={styles.coverImage}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          ) : (
-            <View style={[styles.coverPlaceholder, { backgroundColor: '#1A1A2E' }]}>
-              <Text style={styles.coverEmoji}>{SPECIES_EMOJI[pet.species] ?? '🐾'}</Text>
-            </View>
-          )}
+          <TouchableOpacity 
+            activeOpacity={isOwner ? 0.8 : 1}
+            onPress={isOwner ? handleChangeCoverPhoto : undefined}
+            disabled={addPhotoMutation.isPending}
+          >
+            {profileImage ? (
+              <FastImage
+                source={{ uri: profileImage.url, priority: FastImage.priority.high }}
+                style={styles.coverImage}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+            ) : (
+              <View style={[styles.coverPlaceholder, { backgroundColor: '#1A1A2E' }]}>
+                <Text style={styles.coverEmoji}>{SPECIES_EMOJI[pet.species] ?? '🐾'}</Text>
+              </View>
+            )}
+            {isOwner && (
+              <View style={styles.changeCoverOverlay}>
+                {addPhotoMutation.isPending ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Icon name="camera" size={24} color="#FFFFFF" />
+                    <Text style={styles.changeCoverText}>Change Cover Photo</Text>
+                  </>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.heroOverlay} />
 
           {/* Back button */}
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backIcon}>←</Text>
+            <Icon name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
           {/* Action buttons */}
           <View style={styles.heroActions}>
-            <TouchableOpacity style={styles.heroActionBtn}>
-              <Text style={styles.heroActionIcon}>↗</Text>
+            <TouchableOpacity style={styles.heroActionBtn} onPress={handleShare}>
+              <Icon name="share-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             {isOwner && (
-              <TouchableOpacity style={styles.heroActionBtn}>
-                <Text style={styles.heroActionIcon}>✏</Text>
+              <TouchableOpacity style={styles.heroActionBtn} onPress={handleDelete}>
+                <Icon name="trash-outline" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
@@ -157,6 +358,8 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           {pet.owner && (
             <TouchableOpacity
               style={[styles.ownerRow, { borderColor: isDark ? '#2D2D4E' : '#E5E7EB' }]}
+              onPress={handleViewOwnerProfile}
+              activeOpacity={0.7}
             >
               <Text style={[styles.ownerLabel, { color: subColor }]}>Owner</Text>
               <View style={styles.ownerInfo}>
@@ -169,7 +372,7 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
                 <Text style={[styles.ownerName, { color: textColor }]}>{pet.owner.username}</Text>
               </View>
-              <Text style={[styles.chevron, { color: subColor }]}>›</Text>
+              <Icon name="chevron-forward" size={20} color={subColor} />
             </TouchableOpacity>
           )}
 
@@ -177,19 +380,56 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.actionButtons}>
             {isOwner ? (
               <>
-                <TouchableOpacity style={[styles.outlineBtn, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}>
+                <TouchableOpacity 
+                  style={[styles.outlineBtn, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
+                  onPress={() => navigation.navigate('EditPet' as any, { petId })}
+                >
+                  <Icon name="create-outline" size={18} color={textColor} style={{ marginRight: 6 }} />
                   <Text style={[styles.outlineBtnText, { color: textColor }]}>Edit profile</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtn}>
-                  <Text style={styles.primaryBtnText}>Add photo</Text>
+                <TouchableOpacity 
+                  style={styles.primaryBtn}
+                  onPress={handleAddPhoto}
+                  disabled={addPhotoMutation.isPending}
+                >
+                  {addPhotoMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Icon name="camera-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.primaryBtnText}>Add photo</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <TouchableOpacity style={styles.primaryBtn}>
-                  <Text style={styles.primaryBtnText}>Follow</Text>
+                <TouchableOpacity 
+                  style={styles.primaryBtn}
+                  onPress={handleFollow}
+                  disabled={followMutation.isPending}
+                >
+                  {followMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Icon 
+                        name={pet?.isFollowing ? "checkmark-outline" : "person-add-outline"} 
+                        size={18} 
+                        color="#FFFFFF" 
+                        style={{ marginRight: 6 }} 
+                      />
+                      <Text style={styles.primaryBtnText}>
+                        {pet?.isFollowing ? 'Following' : 'Follow'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.outlineBtn, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}>
+                <TouchableOpacity 
+                  style={[styles.outlineBtn, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
+                  onPress={handleMessage}
+                >
+                  <Icon name="chatbubble-outline" size={18} color={textColor} style={{ marginRight: 6 }} />
                   <Text style={[styles.outlineBtnText, { color: textColor }]}>Message</Text>
                 </TouchableOpacity>
               </>
@@ -199,17 +439,22 @@ const PetProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* Tab Bar */}
         <View style={[styles.tabBar, { backgroundColor: cardBg, borderColor: isDark ? '#2D2D4E' : '#E5E7EB' }]}>
-          {(['grid', 'reels', 'saved'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={styles.tabIcon}>
-                {tab === 'grid' ? '⊞' : tab === 'reels' ? '▶' : '🔖'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(['grid', 'reels', 'saved'] as const).map((tab) => {
+            const iconName = tab === 'grid' ? 'grid-outline' : tab === 'reels' ? 'play-outline' : 'bookmark-outline';
+            return (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.tabActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Icon 
+                  name={iconName} 
+                  size={24} 
+                  color={activeTab === tab ? '#7C3AED' : subColor} 
+                />
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Photo Grid */}
@@ -263,12 +508,24 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
+  changeCoverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  changeCoverText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    marginTop: SPACING.xs,
+  },
   backBtn: {
     position: 'absolute', top: SPACING.lg, left: SPACING.md,
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20,
     width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
   },
-  backIcon: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   heroActions: {
     position: 'absolute', top: SPACING.lg, right: SPACING.md,
     flexDirection: 'row', gap: SPACING.sm,
@@ -277,7 +534,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20,
     width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
   },
-  heroActionIcon: { color: '#FFFFFF', fontSize: 16 },
   profileSection: { padding: SPACING.md, alignItems: 'center', marginTop: -40 },
   avatarWrapper: {
     borderWidth: 3, borderColor: '#7C3AED',
@@ -315,25 +571,26 @@ const styles = StyleSheet.create({
   ownerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   ownerAvatar: { width: 28, height: 28, borderRadius: 14 },
   ownerName: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
-  chevron: { fontSize: 20 },
   actionButtons: { flexDirection: 'row', gap: SPACING.sm, width: '100%' },
   primaryBtn: {
     flex: 1, backgroundColor: '#7C3AED',
     borderRadius: 14, paddingVertical: SPACING.sm,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row',
   },
   primaryBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZE.sm },
   outlineBtn: {
     flex: 1, borderWidth: 1.5,
     borderRadius: 14, paddingVertical: SPACING.sm,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row',
   },
   outlineBtnText: { fontWeight: '700', fontSize: FONT_SIZE.sm },
   tabBar: {
     flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1,
     marginTop: SPACING.sm,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: SPACING.sm },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: SPACING.md },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#7C3AED' },
   tabIcon: { fontSize: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, padding: SPACING.xs },

@@ -23,6 +23,8 @@ import { COLORS, SPACING, FONT_SIZE, QUERY_KEYS } from '../../constants';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { petApi } from '../../services/post.service';
+import { chatApi } from '../../services/chat.api';
+import { blockApi } from '../../services/post.service';
 import { ProfileStackParamList } from '../../types';
 
 const { width } = Dimensions.get('window');
@@ -59,6 +61,7 @@ interface UserProfile {
   followingCount: number;
   petCount: number;
   isFollowing?: boolean;
+  isBlocked?: boolean;
 }
 
 const ProfileScreen: React.FC = () => {
@@ -66,6 +69,7 @@ const ProfileScreen: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [showMoreLink, setShowMoreLink] = useState(false);
+  const [isMessaging, setIsMessaging] = useState(false);
   const { user, logout } = useAuthStore();
   const navigation = useNavigation<ProfileScreenNavProp>();
   const route = useRoute<ProfileScreenRouteProp>();
@@ -113,7 +117,7 @@ const ProfileScreen: React.FC = () => {
   // Follow mutation
   const followMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post(`/follows/${userId}`);
+      const { data } = await api.post(`/follows/users/${userId}`);
       return data.data;
     },
     onSuccess: (data: { following: boolean; followerCount: number }) => {
@@ -137,8 +141,55 @@ const ProfileScreen: React.FC = () => {
   const posts = postsData?.items || [];
   const postsCount = postsData?.total || 0;
 
+  // Block mutation
+  const blockMutation = useMutation({
+    mutationFn: async () => {
+      if (profile?.isBlocked) {
+        return await blockApi.unblockUser(userId);
+      } else {
+        return await blockApi.blockUser(userId);
+      }
+    },
+    onSuccess: () => {
+      Alert.alert('Success', `User ${profile?.isBlocked ? 'unblocked' : 'blocked'} successfully.`);
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USER_PROFILE, userId] });
+      queryClient.invalidateQueries({ queryKey: ['followers'] });
+      queryClient.invalidateQueries({ queryKey: ['following'] });
+      if (!profile?.isBlocked) {
+        // Go back if blocked (optional, but requested by earlier logic), but wait, maybe not go back, just re-render
+        // Actually, if blocked, it's better to just refresh so the user can see it's blocked
+      }
+    },
+    onError: (error: any) => {
+      console.error('Block error:', error);
+      Alert.alert('Error', error.response?.data?.message || `Failed to ${profile?.isBlocked ? 'unblock' : 'block'} user`);
+    },
+  });
+
   const handleFollow = () => {
     followMutation.mutate();
+  };
+
+  const handleMessage = async () => {
+    if (!profile) return;
+    try {
+      setIsMessaging(true);
+      const chat = await chatApi.getOrCreateChat(profile.id);
+      navigation.navigate('ChatRoom', {
+        chatId: chat._id,
+        otherUser: {
+          _id: profile.id,
+          username: profile.username,
+          name: profile.name || profile.username,
+          avatar: profile.avatar,
+        },
+      } as any);
+    } catch (error) {
+      console.error('Message error:', error);
+      Alert.alert('Error', 'Could not start conversation');
+    } finally {
+      setIsMessaging(false);
+    }
   };
 
   const handleShare = async () => {
@@ -179,6 +230,26 @@ const ProfileScreen: React.FC = () => {
 
   const handleEditProfile = () => {
     navigation.navigate('EditProfile');
+  };
+
+  const handleBlockUser = () => {
+    setMenuVisible(false);
+    if (profile?.isBlocked) {
+      blockMutation.mutate();
+    } else {
+      Alert.alert(
+        'Block User',
+        `Are you sure you want to block @${profile?.username}? They will no longer be able to follow you or view your content.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Block', 
+            style: 'destructive',
+            onPress: () => blockMutation.mutate()
+          }
+        ]
+      );
+    }
   };
 
   const handleTextLayout = (e: any) => {
@@ -314,11 +385,17 @@ const ProfileScreen: React.FC = () => {
               <Text style={styles.statNumber}>{postsCount}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem}>
+            <TouchableOpacity 
+              style={styles.statItem}
+              onPress={() => navigation.navigate('FollowersList', { userId, type: 'followers' })}
+            >
               <Text style={styles.statNumber}>{profile.followerCount.toLocaleString()}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem}>
+            <TouchableOpacity 
+              style={styles.statItem}
+              onPress={() => navigation.navigate('FollowersList', { userId, type: 'following' })}
+            >
               <Text style={styles.statNumber}>{profile.followingCount}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
@@ -329,16 +406,20 @@ const ProfileScreen: React.FC = () => {
             <View style={styles.petsSection}>
               <View style={styles.petsSectionHeader}>
                 <Text style={styles.petsTitle}>Pets</Text>
-                <TouchableOpacity>
-                  <Text style={styles.seeAll}>See all</Text>
-                </TouchableOpacity>
+                {pets.length > 3 && (
+                  <Text style={styles.petCount}>{pets.length} pets</Text>
+                )}
               </View>
 
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petsScroll}>
                 {pets.map((pet: any) => {
                   const profileImage = pet.images.find((img: any) => img.isProfile) || pet.images[0];
                   return (
-                    <TouchableOpacity key={pet._id} style={styles.petItem}>
+                    <TouchableOpacity 
+                      key={pet._id} 
+                      style={styles.petItem}
+                      onPress={() => navigation.navigate('PetProfile', { petId: pet._id })}
+                    >
                       <View style={styles.petImageContainer}>
                         <Image 
                           source={{ uri: profileImage?.url || 'https://via.placeholder.com/150' }} 
@@ -352,12 +433,17 @@ const ProfileScreen: React.FC = () => {
                 })}
                 
                 {/* Add Pet Button */}
-                <TouchableOpacity style={styles.addPetButton}>
-                  <View style={styles.addPetCircle}>
-                    <Icon name="add" size={32} color="#7C3AED" />
-                  </View>
-                  <Text style={styles.addPetText}>Add pet</Text>
-                </TouchableOpacity>
+                {isOwnProfile && (
+                  <TouchableOpacity 
+                    style={styles.addPetButton}
+                    onPress={() => navigation.navigate('AddPet')}
+                  >
+                    <View style={styles.addPetCircle}>
+                      <Icon name="add" size={32} color="#7C3AED" />
+                    </View>
+                    <Text style={styles.addPetText}>Add pet</Text>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
             </View>
           )}
@@ -367,10 +453,18 @@ const ProfileScreen: React.FC = () => {
             <View style={styles.noPetsContainer}>
               <MaterialCommunityIcons name="paw-off-outline" size={48} color="#4B5563" />
               <Text style={styles.noPetsText}>No pets added yet</Text>
-              <TouchableOpacity style={styles.addFirstPetButton}>
-                <Icon name="add-circle-outline" size={20} color="#7C3AED" />
-                <Text style={styles.addFirstPetText}>Add your first pet</Text>
-              </TouchableOpacity>
+              {isOwnProfile && (
+                <TouchableOpacity 
+                  style={styles.addFirstPetButton}
+                  onPress={() => {
+                    console.log('Add first pet button pressed');
+                    navigation.navigate('AddPet');
+                  }}
+                >
+                  <Icon name="add-circle-outline" size={20} color="#7C3AED" />
+                  <Text style={styles.addFirstPetText}>Add your first pet</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -386,6 +480,10 @@ const ProfileScreen: React.FC = () => {
                 <Text style={styles.shareButtonText}>Share profile</Text>
               </TouchableOpacity>
             </>
+          ) : profile?.isBlocked ? (
+            <View style={styles.noPetsContainer}>
+              <Text style={styles.noPetsText}>You have blocked this user.</Text>
+            </View>
           ) : (
             <View style={styles.actionButtonsRow}>
               <TouchableOpacity 
@@ -415,9 +513,19 @@ const ProfileScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.messageButton}>
-                <Icon name="mail-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.messageButtonText}>Message</Text>
+              <TouchableOpacity 
+                style={styles.messageButton}
+                onPress={handleMessage}
+                disabled={isMessaging}
+              >
+                {isMessaging ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Icon name="mail-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.messageButtonText}>Message</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -497,25 +605,45 @@ const ProfileScreen: React.FC = () => {
               <Text style={styles.menuText}>Share profile</Text>
             </TouchableOpacity>
 
-            <View style={styles.menuDivider} />
+            {!isOwnProfile && (
+              <>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleBlockUser}
+                  disabled={blockMutation.isPending}
+                >
+                  <Icon name={profile?.isBlocked ? "checkmark-circle-outline" : "ban-outline"} size={22} color={profile?.isBlocked ? "#10B981" : "#EF4444"} />
+                  <Text style={[styles.menuText, !profile?.isBlocked && styles.logoutText, profile?.isBlocked && { color: '#10B981' }]}>
+                    {blockMutation.isPending ? 'Processing...' : profile?.isBlocked ? 'Unblock user' : 'Block user'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={handleSettings}
-            >
-              <Icon name="settings-outline" size={22} color="#FFFFFF" />
-              <Text style={styles.menuText}>Settings</Text>
-            </TouchableOpacity>
+            {isOwnProfile && (
+              <>
+                <View style={styles.menuDivider} />
 
-            <View style={styles.menuDivider} />
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleSettings}
+                >
+                  <Icon name="settings-outline" size={22} color="#FFFFFF" />
+                  <Text style={styles.menuText}>Settings</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={handleLogout}
-            >
-              <Icon name="log-out-outline" size={22} color="#EF4444" />
-              <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
-            </TouchableOpacity>
+                <View style={styles.menuDivider} />
+
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={handleLogout}
+                >
+                  <Icon name="log-out-outline" size={22} color="#EF4444" />
+                  <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </Pressable>
       </Modal>
@@ -698,6 +826,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  petCount: {
+    fontSize: FONT_SIZE.sm,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   seeAll: {
     fontSize: FONT_SIZE.md,

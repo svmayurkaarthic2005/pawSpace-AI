@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
-import { CommunityMembership } from '../../types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CommunityMembership, ExploreStackParamList } from '../../types';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { formatCount, formatRelativeTime } from '../../utils/format';
 
@@ -12,13 +13,14 @@ interface CommunityRowProps {
 }
 
 export const CommunityRow: React.FC<CommunityRowProps> = ({ item }) => {
-  const navigation = useNavigation();
+  type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, 'CommunityDetail'>;
+  const navigation = useNavigation<NavigationProp>();
 
   const handlePress = () => {
-    navigation.navigate('CommunityDetail' as never, {
+    navigation.navigate('CommunityDetail', {
       communityId: item.community.id,
       community: item.community,
-    } as never);
+    });
   };
 
   return (
@@ -48,8 +50,8 @@ export const CommunityRow: React.FC<CommunityRowProps> = ({ item }) => {
           )}
         </View>
         <View style={styles.metaRow}>
-          <Text style={styles.memberCount}>{formatCount(item.community.memberCount)} members</Text>
-          {item.community.species.slice(0, 2).map((s) => (
+          <Text style={styles.memberCount}>{formatCount(item.community.memberCount ?? 0)} members</Text>
+          {(item.community.species ?? []).slice(0, 2).map((s) => (
             <SpeciesBadge key={s} species={s} size="xs" />
           ))}
         </View>

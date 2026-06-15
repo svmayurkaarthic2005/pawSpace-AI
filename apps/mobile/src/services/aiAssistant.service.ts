@@ -49,7 +49,9 @@ export const streamAIChat = (
   callbacks: StreamCallbacks,
 ): XMLHttpRequest => {
   const xhr = new XMLHttpRequest();
-  const baseURL = api.defaults.baseURL || 'http://10.0.2.2:5000/api';
+  const baseURL = api.defaults.baseURL || 'http://10.0.2.2:5000/api/v1';
+  
+  console.log('[AI Assistant] Starting stream:', { baseURL, endpoint: `${baseURL}/ai/assistant/chat` });
   
   xhr.open('POST', `${baseURL}/ai/assistant/chat`);
   xhr.setRequestHeader('Content-Type', 'application/json');
@@ -72,6 +74,7 @@ export const streamAIChat = (
           const raw = line.slice(6).trim();
           
           if (raw === '[DONE]') {
+            console.log('[AI Assistant] Stream completed');
             callbacks.onDone();
             return;
           }
@@ -80,6 +83,7 @@ export const streamAIChat = (
             const parsed = JSON.parse(raw);
             
             if (parsed.error) {
+              console.error('[AI Assistant] Stream error:', parsed);
               callbacks.onError(parsed.message || 'An error occurred');
               return;
             }
@@ -92,7 +96,7 @@ export const streamAIChat = (
               callbacks.onSuggestions(parsed.suggestions);
             }
           } catch (err) {
-            console.warn('Failed to parse SSE data:', raw);
+            console.warn('[AI Assistant] Failed to parse SSE data:', raw, err);
           }
         }
       }
@@ -100,12 +104,19 @@ export const streamAIChat = (
 
     if (xhr.readyState === 4) {
       if (xhr.status !== 200) {
-        callbacks.onError(xhr.status === 429 ? 'AI is busy, try again in a moment.' : 'Network error. Please check your connection.');
+        console.error('[AI Assistant] Request failed:', { status: xhr.status, response: xhr.responseText });
+        const errorMsg = xhr.status === 429 
+          ? 'AI is busy, try again in a moment.' 
+          : xhr.status === 401
+          ? 'Authentication failed. Please log in again.'
+          : 'Network error. Please check your connection.';
+        callbacks.onError(errorMsg);
       }
     }
   };
 
   xhr.onerror = () => {
+    console.error('[AI Assistant] Network error');
     callbacks.onError('Network error. Please check your connection.');
   };
 

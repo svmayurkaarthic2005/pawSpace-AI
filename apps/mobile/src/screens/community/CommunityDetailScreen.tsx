@@ -32,7 +32,7 @@ export const CommunityDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   
-  const { communityId, community: initialCommunity } = route.params;
+  const { communityId, community: initialCommunity } = (route.params ?? {}) as any;
 
   const [isMember, setIsMember] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);

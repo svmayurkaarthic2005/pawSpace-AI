@@ -31,7 +31,42 @@ export class PetService {
     // Delete all Cloudinary images
     await Promise.all(pet.images.map((img) => deleteImage(img.publicId)));
 
+    // Clean up related data
+    // 1. Get all users who follow this pet
+    const { Follow } = await import('../models/follow.model');
+    const { Post } = await import('../models/post.model');
+    
+    const petFollowers = await Follow.find({ 
+      following: petId, 
+      entityType: 'Pet' 
+    }).select('follower').lean().exec();
+    
+    const followerIds = petFollowers.map(f => f.follower.toString());
+
+    // 2. Delete all follow relationships for this pet
+    await Follow.deleteMany({ following: petId, entityType: 'Pet' }).exec();
+
+    // 3. Delete all posts where this pet is tagged
+    await Post.deleteMany({ taggedPets: petId }).exec();
+
+    // 4. Remove pet from posts where it's in the taggedPets array (if not the main subject)
+    await Post.updateMany(
+      { taggedPets: petId },
+      { $pull: { taggedPets: petId } }
+    ).exec();
+
+    // 5. Decrement followingCount for all users who followed this pet
+    if (followerIds.length > 0) {
+      await User.updateMany(
+        { _id: { $in: followerIds } },
+        { $inc: { followingCount: -1 } }
+      ).exec();
+    }
+
+    // 6. Delete the pet
     await petRepository.delete(petId);
+    
+    // 7. Decrement owner's petCount
     await User.findByIdAndUpdate(userId, { $inc: { petCount: -1 } }).exec();
   }
 

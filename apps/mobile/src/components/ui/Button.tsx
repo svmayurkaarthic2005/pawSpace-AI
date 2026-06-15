@@ -62,7 +62,7 @@ const Button: React.FC<ButtonProps> = ({
     opacity: isDisabled ? 0.55 : 1,
     ...(variant === 'primary' && {
       backgroundColor: colors.primary,
-      ...shadows.purple,
+      ...(shadows?.purple ?? {}),
     }),
     ...(variant === 'secondary' && {
       backgroundColor: 'transparent',

@@ -43,39 +43,33 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onReaction }) =>
     const lines = content.split('\n');
     
     return lines.map((line, index) => {
+      // Check for bullet points (*, -, •)
+      const isBullet = /^\\s*[\\*\\-\\•]\\s/.test(line);
+      const lineContent = isBullet ? line.replace(/^\\s*[\\*\\-\\•]\\s/, '') : line;
+      
       // Handle bold text **text**
-      const parts = line.split(/(\*\*.*?\*\*)/g);
+      const parts = lineContent.split(/(\\**.*?\\**)/g);
       
       return (
-        <View key={index} style={styles.line}>
-          {parts.map((part, partIndex) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return (
-                <Text key={partIndex} style={[styles.aiText, styles.boldText]}>
-                  {part.slice(2, -2)}
-                </Text>
-              );
-            }
-            
-            // Handle bullet points
-            if (part.startsWith('• ')) {
-              return (
-                <View key={partIndex} style={styles.bulletContainer}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.aiText}>{part.slice(2)}</Text>
-                </View>
-              );
-            }
-            
-            return part ? (
-              <Text key={partIndex} style={styles.aiText}>
-                {part}
-              </Text>
-            ) : null;
-          })}
-          {index === lines.length - 1 && message.isStreaming && (
-            <Animated.Text style={[styles.cursor, cursorStyle]}>|</Animated.Text>
-          )}
+        <View key={index} style={[styles.line, isBullet && styles.bulletLine]}>
+          {isBullet && <Text style={styles.bullet}>•</Text>}
+          <View style={isBullet ? styles.bulletTextContainer : undefined}>
+            <Text style={styles.aiText}>
+              {parts.map((part, partIndex) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  return (
+                    <Text key={partIndex} style={styles.boldText}>
+                      {part.slice(2, -2)}
+                    </Text>
+                  );
+                }
+                return part;
+              })}
+              {index === lines.length - 1 && message.isStreaming && (
+                <Animated.Text style={[styles.cursor, cursorStyle]}>|</Animated.Text>
+              )}
+            </Text>
+          </View>
         </View>
       );
     });
@@ -133,85 +127,91 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onReaction }) =>
 const styles = StyleSheet.create({
   userContainer: {
     alignSelf: 'flex-end',
-    marginTop: 6,
-    maxWidth: '72%',
+    marginTop: 8,
+    marginBottom: 4,
+    maxWidth: '75%',
   },
   userBubble: {
     backgroundColor: '#7C3AED',
-    borderRadius: 18,
+    borderRadius: 20,
     borderBottomRightRadius: 4,
-    padding: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   userText: {
     fontSize: 15,
     color: '#FFFFFF',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   aiContainer: {
     alignSelf: 'flex-start',
-    maxWidth: '80%',
-    marginTop: 6,
+    maxWidth: '85%',
+    marginTop: 8,
+    marginBottom: 4,
   },
   aiWrapper: {
     position: 'relative',
   },
   sparkleBadge: {
     position: 'absolute',
-    top: -6,
-    left: -6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -8,
+    left: -8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#7C3AED',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
+    borderWidth: 2,
+    borderColor: '#0D0D1A',
   },
   aiBubble: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
     borderTopLeftRadius: 4,
-    padding: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   line: {
+    marginBottom: 6,
+  },
+  bulletLine: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 4,
+    marginLeft: 8,
+  },
+  bulletTextContainer: {
+    flex: 1,
   },
   aiText: {
     fontSize: 15,
     color: '#FFFFFF',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   boldText: {
     fontWeight: '700',
   },
-  bulletContainer: {
-    flexDirection: 'row',
-    marginLeft: 8,
-    flex: 1,
-  },
   bullet: {
     fontSize: 15,
     color: '#FFFFFF',
-    marginRight: 6,
+    marginRight: 8,
+    marginTop: 0,
   },
   cursor: {
     fontSize: 15,
-    color: '#FFFFFF',
+    color: '#A78BFA',
     marginLeft: 2,
   },
   reactionRow: {
     flexDirection: 'row',
-    marginTop: 6,
+    marginTop: 8,
     gap: 12,
+    marginLeft: 4,
   },
   reactionBtn: {
-    padding: 4,
+    padding: 6,
   },
 });
 

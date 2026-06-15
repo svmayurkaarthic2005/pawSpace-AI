@@ -17,7 +17,7 @@ const PostCardHeader: React.FC<PostCardHeaderProps> = ({ post, onMenuPress }) =>
     <View style={styles.header}>
       <TouchableOpacity
         style={styles.userInfo}
-        onPress={() => navigation.navigate('Profile', { userId: post.author._id })}
+        onPress={() => navigation.push('Profile', { userId: post.author._id })}
         activeOpacity={0.7}
       >
         <Image

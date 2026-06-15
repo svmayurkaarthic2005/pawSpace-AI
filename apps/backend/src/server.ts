@@ -130,7 +130,7 @@ app.get('/health', async (_req: Request, res: Response) => {
       googleMaps: googleMapsConfigured && !googleMapsIsPlaceholder ? 'configured' : 'not_configured',
       cloudinary: env.CLOUDINARY_API_KEY ? 'configured' : 'not_configured',
       firebase: env.FIREBASE_PROJECT_ID ? 'configured' : 'not_configured',
-      groq: env.GROQ_API_KEY ? 'configured' : 'not_configured',
+      groq: env.GEMINI_API_KEY ? 'configured' : 'not_configured',
     },
     warnings: warnings.length > 0 ? warnings : undefined,
   });
@@ -187,7 +187,17 @@ const bootstrap = async (): Promise<void> => {
     await redis.ping();
     console.log('✅ Redis ping successful');
 
-    httpServer.listen(env.PORT, () => {
+    // Handle listen errors (EADDRINUSE happens asynchronously, so catch it here)
+    httpServer.on('error', (err: any) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`💥 Port ${env.PORT} already in use. Free the port or set a different PORT env var.`);
+        process.exit(1);
+      }
+      console.error('💥 HTTP server error:', err);
+      process.exit(1);
+    });
+
+    httpServer.listen(env.PORT, '0.0.0.0', () => {
       console.log(`🚀 PawSpace API running on port ${env.PORT} [${env.NODE_ENV}]`);
       console.log(`🔗 Health: http://localhost:${env.PORT}/health`);
     });

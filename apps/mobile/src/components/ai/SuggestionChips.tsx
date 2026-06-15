@@ -72,12 +72,13 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
       style={styles.scrollView}
     >
       {suggestions.map((suggestion, index) => (
-        <SuggestionChip
-          key={index}
-          text={suggestion}
-          onPress={() => onPress(suggestion)}
-          style={style}
-        />
+        <View key={index} style={index > 0 && styles.chipWrapper}>
+          <SuggestionChip
+            text={suggestion}
+            onPress={() => onPress(suggestion)}
+            style={style}
+          />
+        </View>
       ))}
     </ScrollView>
   );
@@ -89,27 +90,31 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingVertical: 10,
+    paddingRight: 32,
+  },
+  chipWrapper: {
+    marginLeft: 10,
   },
   chip: {
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.5)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(124,58,237,0.6)',
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: 'transparent',
   },
   chipFilled: {
-    backgroundColor: 'rgba(124,58,237,0.15)',
+    backgroundColor: 'rgba(124,58,237,0.2)',
+    borderColor: 'rgba(124,58,237,0.7)',
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#A78BFA',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   chipTextFilled: {
-    color: '#A78BFA',
+    color: '#C4B5FD',
   },
 });
 

@@ -32,7 +32,6 @@ export class ChatService {
     const id1 = new mongoose.Types.ObjectId(userId1);
     const id2 = new mongoose.Types.ObjectId(userId2);
 
-    // Find existing chat where both users are participants
     const existing = await Chat.findOne({
       participants: { $all: [id1, id2], $size: 2 },
     })
@@ -41,6 +40,18 @@ export class ChatService {
       .exec();
 
     if (existing) return existing;
+
+    const { Block } = await import('../models/block.model');
+    const hasBlock = await Block.exists({
+      $or: [
+        { blocker: id1, blocked: id2 },
+        { blocker: id2, blocked: id1 }
+      ]
+    });
+
+    if (hasBlock) {
+      throw new AppError('Cannot create chat, user is blocked', 403, true, 'FORBIDDEN');
+    }
 
     // Create new chat
     const chat = new Chat({
@@ -68,6 +79,22 @@ export class ChatService {
 
     const isParticipant = chat.participants.some((p) => p.toString() === senderId);
     if (!isParticipant) throw new AppError('Not a participant', 403, true, 'FORBIDDEN');
+
+    const recipientId = chat.participants.find((p) => p.toString() !== senderId)?.toString();
+
+    if (recipientId) {
+      const { Block } = await import('../models/block.model');
+      const hasBlock = await Block.exists({
+        $or: [
+          { blocker: senderId, blocked: recipientId },
+          { blocker: recipientId, blocked: senderId }
+        ]
+      });
+
+      if (hasBlock) {
+        throw new AppError('Cannot send message, user is blocked', 403, true, 'FORBIDDEN');
+      }
+    }
 
     // Create message
     const message = new Message({

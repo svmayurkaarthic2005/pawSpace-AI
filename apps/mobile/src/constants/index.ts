@@ -60,15 +60,16 @@ export const QUERY_KEYS = {
 // ─── Theme ────────────────────────────────────────────────────────────────────
 
 export const COLORS = {
-  primary: '#FF6B35',
-  primaryLight: '#FF8C5A',
-  primaryDark: '#E55A25',
+  primary: '#7C3AED',
+  primaryLight: '#9F67FF',
+  primaryDark: '#6D28D9',
   secondary: '#4ECDC4',
-  background: '#FAFAFA',
+  background: '#0D0D1A',
+  backgroundCard: '#1A1A2E',
   surface: '#FFFFFF',
-  text: '#1A1A2E',
-  textSecondary: '#6B7280',
-  border: '#E5E7EB',
+  text: '#FFFFFF',
+  textSecondary: '#9CA3AF',
+  border: 'rgba(255,255,255,0.1)',
   error: '#EF4444',
   success: '#10B981',
   warning: '#F59E0B',

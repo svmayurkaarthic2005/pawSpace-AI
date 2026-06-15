@@ -12,6 +12,7 @@ import exploreRoutes from './explore.routes';
 import discoveryRoutes from './discovery.routes';
 import googlePlacesRoutes from './googlePlaces.routes';
 import notificationRoutes from './notification.routes';
+import blockRoutes from './block.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/search', exploreRoutes); // search endpoints also in explore routes
 router.use('/discovery', discoveryRoutes);
 router.use('/places', googlePlacesRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/blocks', blockRoutes);
 
 export default router;

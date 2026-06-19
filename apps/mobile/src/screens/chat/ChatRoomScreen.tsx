@@ -2,8 +2,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
-  useColorScheme, Alert, Modal, Image,
+  Alert, Modal, Image,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import FeatherIcon from 'react-native-vector-icons/Feather';
 import FastImage from 'react-native-fast-image';
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat,
@@ -18,7 +20,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useChat } from '../../hooks/useChat';
 import { SerializedMessage } from '../../services/socket.service';
 import { timeAgo } from '../../utils';
-import { FONT_SIZE, SPACING } from '../../constants';
+import { FONT_SIZE, SPACING, COLORS } from '../../constants';
 import { nanoid } from '../../utils/nanoid';
 
 type Props = NativeStackScreenProps<any, 'ChatRoom'>;
@@ -80,12 +82,11 @@ const typingStyles = StyleSheet.create({
 interface BubbleProps {
   message: SerializedMessage;
   isMine: boolean;
-  isDark: boolean;
   onLongPress: (msg: SerializedMessage) => void;
   onImagePress: (url: string) => void;
 }
 
-const MessageBubble: React.FC<BubbleProps> = ({ message, isMine, isDark, onLongPress, onImagePress }) => {
+const MessageBubble: React.FC<BubbleProps> = ({ message, isMine, onLongPress, onImagePress }) => {
   const isDeleted = message.isDeleted;
   const isImage = message.content.type === 'image';
   const isAI = message.content.type === 'ai_suggestion';
@@ -150,11 +151,10 @@ const MessageBubble: React.FC<BubbleProps> = ({ message, isMine, isDark, onLongP
 
 const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   const { chatId, otherUser } = (route.params ?? {}) as any;
-  const isDark = useColorScheme() === 'dark';
   const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
-  const { messages, typingUsers, onlineUsers, setMessages, setActiveChat } = useChatStore();
+  const { messages, typingUsers, onlineUsers, mergeMessages, setActiveChat } = useChatStore();
   const chatMessages = messages[chatId] ?? [];
   const isTyping = (typingUsers[chatId] ?? []).length > 0;
   const isOtherOnline = onlineUsers.has(otherUser._id);
@@ -162,6 +162,7 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [showAttachSheet, setShowAttachSheet] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -182,9 +183,9 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     if (data) {
       const allMessages = data.pages.flatMap((p) => p.messages || p.items || []);
-      setMessages(chatId, allMessages);
+      mergeMessages(chatId, allMessages);
     }
-  }, [data, chatId, setMessages]);
+  }, [data, chatId, mergeMessages]);
 
   useEffect(() => {
     setActiveChat(chatId);
@@ -240,18 +241,20 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [inputText, isSending, chatId, currentUser, sendMessage, stopTyping]);
 
-  const handlePickImage = useCallback(async () => {
+  const handlePickImage = useCallback(async (fromCamera = false) => {
+    setShowAttachSheet(false);
     try {
-      const result = await launchImageLibrary({ 
-        mediaType: 'mixed', 
-        quality: 0.8,
-        videoQuality: 'high',
-      });
+      const result = fromCamera
+        ? await launchImageLibrary({ mediaType: 'photo', quality: 0.8 }) // fallback — camera needs launchCamera
+        : await launchImageLibrary({ 
+            mediaType: 'mixed', 
+            quality: 0.8,
+            videoQuality: 'high',
+          });
       
       if (result.assets?.[0]) {
         const asset = result.assets[0];
         
-        // Validate video duration (max 59 seconds)
         if (asset.type?.startsWith('video') && asset.duration) {
           if (asset.duration > 59) {
             Alert.alert(
@@ -271,6 +274,19 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
       console.error('Error picking media:', error);
     }
   }, [sendImageMessage]);
+
+  const handleAttachmentPress = useCallback(() => {
+    Alert.alert(
+      'Attach',
+      'Choose an option',
+      [
+        { text: '📷 Camera', onPress: () => handlePickImage(true) },
+        { text: '🖼️ Photo & Video', onPress: () => handlePickImage(false) },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  }, [handlePickImage]);
 
   const handleTyping = useCallback(
     (text: string) => {
@@ -302,10 +318,41 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     ]);
   }, [chatId, currentUser]);
 
-  const bg = isDark ? '#080810' : '#F8F8FF';
-  const inputBg = isDark ? '#1A1A2E' : '#FFFFFF';
-  const textColor = isDark ? '#FFFFFF' : '#1A1A2E';
-  const subColor = isDark ? '#9CA3AF' : '#6B7280';
+  const handleVideoCall = useCallback(() => {
+    if (!isOtherOnline) {
+      Toast.show({
+        type: 'info',
+        text1: 'User is offline',
+        text2: `${otherUser.name} is currently offline and cannot receive calls.`,
+      });
+      return;
+    }
+
+    const currentTimestamp = Date.now();
+    const sortedIds = [currentUser?.id || '', otherUser._id].sort().join('_');
+    const newChannelName = `call_${sortedIds}_${currentTimestamp}`;
+
+    socketService.inviteCall({
+      toUserId: otherUser._id,
+      channelName: newChannelName,
+      callerName: currentUser?.displayName || currentUser?.username || 'User',
+      callerAvatar: currentUser?.avatarUrl,
+    });
+
+    (navigation as any).navigate('VideoCall', {
+      channelName: newChannelName,
+      remoteUserId: otherUser._id,
+      remoteUserName: otherUser.name,
+      remoteUserAvatar: otherUser.avatar,
+      isCaller: true,
+    });
+  }, [isOtherOnline, otherUser, currentUser, navigation]);
+
+  const bg = COLORS.background;
+  const inputBg = 'rgba(26, 26, 46, 0.85)'; // Glassmorphism background for input
+  const headerBg = COLORS.backgroundCard;
+  const textColor = COLORS.text;
+  const subColor = COLORS.textSecondary;
 
   const avatarUri =
     otherUser.avatar ??
@@ -314,12 +361,19 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View style={[styles.root, { backgroundColor: bg }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: inputBg }]}>
+      <View style={[styles.header, { backgroundColor: headerBg }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={[styles.backIcon, { color: textColor }]}>←</Text>
+          <Icon name="arrow-back" size={24} color={textColor} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerUser}>
-          <FastImage source={{ uri: avatarUri, priority: FastImage.priority.high }} style={styles.headerAvatar} />
+        <TouchableOpacity
+          style={styles.headerUser}
+          onPress={() => (navigation as any).navigate('Profile', { userId: otherUser._id })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.headerAvatarWrapper}>
+            <FastImage source={{ uri: avatarUri, priority: FastImage.priority.high }} style={styles.headerAvatar} />
+            {isOtherOnline && <View style={styles.onlineDot} />}
+          </View>
           <View>
             <Text style={[styles.headerName, { color: textColor }]}>{otherUser.name}</Text>
             <Text style={[styles.headerStatus, { color: isOtherOnline ? '#10B981' : subColor }]}>
@@ -329,13 +383,13 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerActionBtn}>
-            <Text style={styles.headerActionIcon}>✦</Text>
+            <Icon name="sparkles-outline" size={20} color="#A78BFA" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerActionBtn} onPress={handleVideoCall}>
+            <Icon name="videocam-outline" size={22} color="#A78BFA" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerActionBtn}>
-            <Text style={styles.headerActionIcon}>📹</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionBtn}>
-            <Text style={styles.headerActionIcon}>···</Text>
+            <FeatherIcon name="more-vertical" size={20} color="#A78BFA" />
           </TouchableOpacity>
         </View>
       </View>
@@ -355,7 +409,6 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             <MessageBubble
               message={item}
               isMine={item.sender._id === currentUser?.id}
-              isDark={isDark}
               onLongPress={handleLongPress}
               onImagePress={(url) => setExpandedImage(url)}
             />
@@ -376,14 +429,14 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* Input Bar */}
         <View style={[styles.inputBar, { backgroundColor: inputBg }]}>
-          <TouchableOpacity style={styles.inputAction}>
-            <Text style={styles.inputActionIcon}>＋</Text>
+          <TouchableOpacity style={styles.inputAction} onPress={handleAttachmentPress}>
+            <FeatherIcon name="plus" size={22} color="#A78BFA" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.inputAction}>
-            <Text style={styles.inputActionIcon}>✦</Text>
+          <TouchableOpacity style={styles.inputAction} onPress={() => handlePickImage(false)}>
+            <Icon name="sparkles-outline" size={20} color="#A78BFA" />
           </TouchableOpacity>
           <TextInput
-            style={[styles.input, { color: textColor, backgroundColor: isDark ? '#0D0D1A' : '#F3F4F6' }]}
+            style={[styles.input, { color: textColor }]}
             placeholder="Message..."
             placeholderTextColor={subColor}
             value={inputText}
@@ -392,9 +445,6 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             maxLength={4000}
             returnKeyType="default"
           />
-          <TouchableOpacity style={styles.inputAction} onPress={handlePickImage}>
-            <Text style={styles.inputActionIcon}>📷</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
             onPress={handleSend}
@@ -403,7 +453,7 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             {isSending ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.sendIcon}>▶</Text>
+              <Icon name="send" size={18} color="#fff" />
             )}
           </TouchableOpacity>
         </View>
@@ -437,31 +487,48 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   backBtn: { padding: SPACING.xs, marginRight: SPACING.xs },
-  backIcon: { fontSize: 22, fontWeight: '700' },
   headerUser: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  headerAvatarWrapper: { position: 'relative' },
   headerAvatar: { width: 38, height: 38, borderRadius: 19 },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: COLORS.backgroundCard,
+  },
   headerName: { fontSize: FONT_SIZE.md, fontWeight: '700' },
   headerStatus: { fontSize: 11, marginTop: 1 },
   headerActions: { flexDirection: 'row', gap: SPACING.xs },
   headerActionBtn: { padding: SPACING.xs },
-  headerActionIcon: { fontSize: 18, color: '#7C3AED' },
   messageList: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.sm },
   bubbleWrapper: { marginBottom: SPACING.xs },
   bubbleLeft: { alignItems: 'flex-start' },
   bubbleRight: { alignItems: 'flex-end' },
   bubble: {
-    maxWidth: '78%',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    maxWidth: '82%',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   bubbleMine: {
     backgroundColor: '#7C3AED',
     borderBottomRightRadius: 4,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   bubbleTheirs: {
-    backgroundColor: '#2D2D4E',
+    backgroundColor: '#1E1E36',
     borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   bubbleDeleted: { opacity: 0.5 },
   bubbleText: { fontSize: FONT_SIZE.sm, lineHeight: 20 },
@@ -499,21 +566,24 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
     gap: SPACING.xs,
   },
   inputAction: { padding: SPACING.xs, alignSelf: 'flex-end', paddingBottom: 10 },
-  inputActionIcon: { fontSize: 22, color: '#7C3AED' },
+  inputActionIcon: { fontSize: 24, color: '#A78BFA' },
   input: {
     flex: 1,
-    borderRadius: 22,
+    borderRadius: 24,
     paddingHorizontal: SPACING.md,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
-    fontSize: FONT_SIZE.sm,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    fontSize: FONT_SIZE.md,
     maxHeight: 120,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   sendBtn: {
     width: 40,

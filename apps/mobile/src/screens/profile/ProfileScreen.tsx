@@ -296,20 +296,23 @@ const ProfileScreen: React.FC = () => {
           ) : (
             <View style={[styles.coverPhoto, styles.defaultCover]} />
           )}
-          
+
+          {/* Dark overlay at top and bottom for readability */}
+          <View style={styles.coverOverlay} />
+
           {/* Header Icons */}
           <View style={styles.headerIcons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#FFFFFF" />
+              <Icon name="arrow-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => setMenuVisible(true)}
             >
-              <Icon name="ellipsis-vertical" size={24} color="#FFFFFF" />
+              <Icon name="ellipsis-vertical" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -319,8 +322,13 @@ const ProfileScreen: React.FC = () => {
               <Image source={{ uri: profile.avatar }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.defaultAvatar]}>
-                <Icon name="person" size={40} color="#6B7280" />
+                <Icon name="person" size={44} color="#9CA3AF" />
               </View>
+            )}
+            {isOwnProfile && (
+              <TouchableOpacity style={styles.editAvatarBtn} onPress={handleEditProfile}>
+                <Icon name="camera" size={14} color="#fff" />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -385,14 +393,16 @@ const ProfileScreen: React.FC = () => {
               <Text style={styles.statNumber}>{postsCount}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <View style={styles.statDivider} />
+            <TouchableOpacity
               style={styles.statItem}
               onPress={() => navigation.navigate('FollowersList', { userId, type: 'followers' })}
             >
               <Text style={styles.statNumber}>{profile.followerCount.toLocaleString()}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <View style={styles.statDivider} />
+            <TouchableOpacity
               style={styles.statItem}
               onPress={() => navigation.navigate('FollowersList', { userId, type: 'following' })}
             >
@@ -690,48 +700,68 @@ const styles = StyleSheet.create({
   coverPhoto: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#1F2937',
   },
   defaultCover: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#16213E',
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13,13,26,0.35)',
   },
   headerIcons: {
     position: 'absolute',
-    top: 50,
+    top: 52,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
+    zIndex: 10,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   avatarContainer: {
     position: 'absolute',
-    bottom: -40,
+    bottom: -44,
     left: SPACING.lg,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
     borderWidth: 4,
     borderColor: '#0D0D1A',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1A1A2E',
   },
   defaultAvatar: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#1A1A2E',
+  },
+  editAvatarBtn: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0D0D1A',
   },
   infoSection: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 50,
+    paddingTop: 56,
   },
   nameRow: {
     flexDirection: 'row',
@@ -793,12 +823,19 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-around',
     marginTop: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#1F2937',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   statItem: {
     alignItems: 'center',
@@ -913,25 +950,32 @@ const styles = StyleSheet.create({
   editButton: {
     marginTop: SPACING.lg,
     backgroundColor: '#7C3AED',
-    paddingVertical: SPACING.sm,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     alignItems: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
   editButtonText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   shareButton: {
     marginTop: SPACING.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#7C3AED',
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(124,58,237,0.5)',
     gap: 8,
+    backgroundColor: 'rgba(124,58,237,0.08)',
   },
   shareButtonText: {
     fontSize: FONT_SIZE.md,
@@ -948,15 +992,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     backgroundColor: '#7C3AED',
     gap: 6,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   followingButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
+    backgroundColor: 'rgba(124,58,237,0.1)',
+    borderWidth: 1.5,
     borderColor: '#7C3AED',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   followButtonText: {
     fontSize: FONT_SIZE.md,
@@ -971,10 +1022,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#4B5563',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     gap: 6,
   },
   messageButtonText: {

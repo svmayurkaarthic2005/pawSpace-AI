@@ -1,4 +1,4 @@
-import auth from '@react-native-firebase/auth';
+import { getAuth, signInWithCredential, signOut as firebaseSignOut, onAuthStateChanged as firebaseOnAuthStateChanged, GoogleAuthProvider } from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 /**
@@ -36,10 +36,10 @@ export const signInWithGoogle = async () => {
     }
     
     // Create Firebase credential with the token
-    const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+    const googleCredential = GoogleAuthProvider.credential(idToken);
     
     // Sign in with Firebase
-    const userCredential = await auth().signInWithCredential(googleCredential);
+    const userCredential = await signInWithCredential(getAuth(), googleCredential);
     
     console.log('[FirebaseAuth] User signed in:', userCredential.user.email);
     
@@ -62,7 +62,7 @@ export const signOut = async () => {
       console.warn('[FirebaseAuth] Google revokeAccess error (safe to ignore if not signed in):', e);
     }
     await GoogleSignin.signOut();
-    await auth().signOut();
+    await firebaseSignOut(getAuth());
     console.log('[FirebaseAuth] User signed out');
   } catch (error) {
     console.error('[FirebaseAuth] Sign out error:', error);
@@ -77,7 +77,7 @@ export const signOut = async () => {
  */
 export const getCurrentUser = () => {
   console.warn('[FirebaseAuth] getCurrentUser() is deprecated. Use onAuthStateChanged() instead.');
-  return auth().currentUser;
+  return getAuth().currentUser;
 };
 
 /**
@@ -86,7 +86,7 @@ export const getCurrentUser = () => {
  */
 export const getIdToken = async (): Promise<string | null> => {
   return new Promise((resolve) => {
-    const unsubscribe = auth().onAuthStateChanged(async (user: any) => {
+    const unsubscribe = firebaseOnAuthStateChanged(getAuth(), async (user: any) => {
       unsubscribe(); // Unsubscribe immediately after getting user
       if (!user) {
         resolve(null);
@@ -108,5 +108,5 @@ export const getIdToken = async (): Promise<string | null> => {
  * Listen to Firebase auth state changes
  */
 export const onAuthStateChanged = (callback: (user: any) => void) => {
-  return auth().onAuthStateChanged(callback);
+  return firebaseOnAuthStateChanged(getAuth(), callback);
 };

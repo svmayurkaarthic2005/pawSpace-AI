@@ -18,6 +18,7 @@ interface ChatState {
   setCurrentActiveChatId: (chatId: string | null) => void;
   setActiveChat: (chatId: string | null) => void;
   setMessages: (chatId: string, messages: SerializedMessage[]) => void;
+  mergeMessages: (chatId: string, messages: SerializedMessage[]) => void;
   addMessage: (chatId: string, message: SerializedMessage) => void;
   updateMessage: (chatId: string, messageId: string, updates: Partial<SerializedMessage>) => void;
   deleteMessage: (chatId: string, messageId: string) => void;
@@ -45,6 +46,31 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       messages: { ...state.messages, [chatId]: messages },
     })),
+    
+  mergeMessages: (chatId, newMessages) =>
+    set((state) => {
+      const existing = state.messages[chatId] || [];
+      const msgMap = new Map();
+      
+      // Preserve existing messages
+      existing.forEach(m => msgMap.set(m._id, m));
+      
+      // Merge new messages from React Query, preserving optimistic or newer socket ones
+      newMessages.forEach(m => {
+        if (!msgMap.has(m._id)) {
+           msgMap.set(m._id, m);
+        }
+      });
+      
+      // Sort descending (newest first)
+      const merged = Array.from(msgMap.values()).sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      return {
+        messages: { ...state.messages, [chatId]: merged },
+      };
+    }),
   
   addMessage: (chatId, message) =>
     set((state) => {

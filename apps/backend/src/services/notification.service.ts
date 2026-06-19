@@ -46,6 +46,7 @@ const getNotificationMessage = async (
     community_post: `${senderUsername} posted in ${entityName ?? 'a community'}`,
     event_invite: `${senderUsername} invited you to ${entityName ?? 'an event'}`,
     rsvp: `${senderUsername} RSVP'd to ${entityName ?? 'your event'}`,
+    new_post: `${senderUsername} published a new post`,
   };
 
   return templates[type] ?? 'New notification';
@@ -152,6 +153,7 @@ export class NotificationService {
         chat: 'new_message',
         ai_suggestion: 'ai_suggestion',
         event_rsvp: 'event_reminder',
+        new_post: 'new_post',
       };
       
       const fcmType = fcmTypeMap[type] || 'ai_suggestion';

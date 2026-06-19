@@ -131,6 +131,19 @@ export class FollowRepository {
   }
 
   /**
+   * Returns just the IDs of users that follow a specific entity.
+   * Useful for bulk notifications.
+   */
+  async getFollowerIds(entityId: string, entityType: FollowableEntityType): Promise<string[]> {
+    const followers = await Follow.find({ following: entityId, entityType, status: 'accepted' })
+      .select('follower')
+      .lean()
+      .exec();
+
+    return followers.map((f) => (f.follower as mongoose.Types.ObjectId).toString());
+  }
+
+  /**
    * Returns just the IDs of users that userId follows.
    * Cached in Redis for 5 minutes.
    */

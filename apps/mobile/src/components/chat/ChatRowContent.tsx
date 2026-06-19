@@ -27,12 +27,15 @@ export const ChatRowContent: React.FC<ChatRowContentProps> = React.memo(
       return prefix + (content.text || '');
     };
 
+    const avatarUri = chat.otherUser?.avatar || 
+      `https://ui-avatars.com/api/?name=${chat.otherUser?.name || chat.otherUser?.username || 'User'}&background=7C3AED&color=fff`;
+
     return (
       <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
         {/* Avatar */}
         <View style={styles.avatarWrapper}>
           <FastImage
-            source={{ uri: chat.otherUser?.avatar }}
+            source={{ uri: avatarUri }}
             style={styles.avatar}
           />
           {chat.isOnline && !isMuted && <View style={styles.onlineDot} />}

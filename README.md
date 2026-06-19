@@ -4,116 +4,147 @@
 
 ---
 
-## 📖 What is PawSpace?
+## Overview
 
-**PawSpace** is a full-stack, cross-platform mobile application designed exclusively for pet owners. It solves the problem of finding local pet communities, organizing pet playdates, and discovering pet-friendly events. 
-
-By combining real-time communication, robust privacy controls, and advanced location-based discovery, PawSpace provides a seamless social experience. Whether you want to find a walking buddy for your Golden Retriever, arrange a cat cafe meetup, or simply share adorable photos of your pets on a dedicated feed, PawSpace is the hub for it all.
+PawSpace is a full-stack pet-owner social discovery app — find nearby pet owners on a live map, chat in real-time, initiate 1-on-1 video calls, and connect with the local pet community.
 
 ---
 
-## 🛠️ How it Works
+## Tech Stack
 
-PawSpace operates on a modern decoupled architecture:
+### Frontend (Mobile)
+* **Framework**: React Native 0.73.2 (CLI)
+* **Language**: TypeScript
+* **State Management**: Zustand
+* **Data Fetching**: TanStack Query
+* **Navigation**: React Navigation v7 (`@react-navigation/native-stack`, `@react-navigation/bottom-tabs`)
+* **Real-time**: Socket.IO Client
+* **Authentication**: Firebase Auth (Google Sign-In)
+* **Maps & Location**: `react-native-maps` (PROVIDER_GOOGLE), `@transistorsoft/react-native-background-geolocation`
+* **Animations & UI**: React Native Reanimated v3, FlashList, `@gorhom/bottom-sheet`
+* **Integrations**: Gemini API (AI chat assistant), Cloudinary (media upload), `react-native-agora` (video calling)
 
-### 1. Client-Server Architecture
-- **Mobile Client (`apps/mobile`)**: Built with React Native, it provides a native-feeling UX across both iOS and Android. It handles UI rendering, local state management (via Redux Toolkit), remote state caching (via React Query), and background device tasks (like location tracking).
-- **REST API Backend (`apps/backend`)**: A robust Node.js/Express server that acts as the single source of truth. It interfaces with MongoDB to store user profiles, posts, events, and spatial data. It also interfaces with external APIs (like Google Maps & Cloudinary).
-
-### 2. Live Location Engine
-PawSpace utilizes `@transistorsoft/react-native-background-geolocation` to track user movements in the background securely. 
-- When a user moves >50 meters, the app silently pings the `POST /map/location` backend endpoint.
-- The backend stores this as a GeoJSON Point in MongoDB.
-- When other users open the "Discover" map, the backend uses MongoDB's powerful `$geoNear` aggregation pipeline to query users and events within a dynamic radius (e.g., 25km), calculating the exact distance instantly.
-
-### 3. Real-Time Communication (Socket.IO)
-Chat features aren't built on standard polling. Instead, when a user logs in, the mobile app establishes a persistent WebSocket connection to the Node.js backend using `socket.io`.
-- When a user sends a message, it is emitted over the socket.
-- The server receives it, saves it to MongoDB, and instantly broadcasts the `receive_message` event to the recipient's active socket.
-- If the recipient is offline, the backend falls back to **Firebase Cloud Messaging (FCM)** to send a push notification to their device.
-
-### 4. Robust Privacy (Block/Unblock System)
-Privacy is paramount. PawSpace implements a global block architecture. When User A blocks User B, a `Block` document is created in the database. Every critical backend query (fetching the social feed, discovering users on the map, loading events, starting chats) applies a `$nin` (not in) filter using an aggregated list of blocked IDs, ensuring a perfectly sanitized experience.
+### Backend
+* **Environment**: Node.js, Express
+* **Language**: TypeScript
+* **Database**: MongoDB (Mongoose) with powerful `$geoNear` geospatial queries
+* **Real-time**: Socket.IO server
+* **Integrations**: Firebase Admin (Push Notifications), Agora Token Generation (`agora-token`), Cloudinary API
 
 ---
 
-## 🗂️ Detailed File Structure
+## Features
 
-The project is structured as a **Monorepo**, keeping both backend and frontend code tightly organized in a single repository.
+* **🔐 Authentication** — Firebase Auth (Google Sign-In), secure session persistence.
+* **🗺️ Nearby Pet Owner Discovery** — Live map using MongoDB `$geoNear`, featuring dynamic radius + species filtering, and real-time GPS via `watchPosition`.
+* **📍 Live Location Tracking** — Foreground tracking active; fully implemented background tracking (even when the app is minimized or killed) using `react-native-background-geolocation`.
+* **🎯 Auto-Recentering Map** — Follow-me mode accurately tracks the user's location, with manual override upon pan/drag.
+* **💬 Real-time Chat** — Socket.IO powered instant messaging, online/offline presence indicators, and an AI chat assistant powered by Gemini.
+* **📹 Video Calling** — Integrated `react-native-agora` for 1-on-1 video calls, featuring a dedicated incoming call screen, and full in-call controls (mute, camera toggle, switch camera).
+* **👥 Follow System** — Follow/unfollow nearby users and manage your followers list.
+* **🐾 Pet Profiles** — Detailed pet profiles (name, breed, species) with image uploads handled via Cloudinary.
+
+---
+
+## Project Structure
+
+The project is structured as a Monorepo containing both the React Native mobile app and the Node.js backend API:
 
 ```text
-pawspace/
+myapp/
 ├── apps/
-│   ├── backend/                  # Node.js Express REST API Server
-│   │   ├── src/
-│   │   │   ├── config/           # Environment variables, DB connection, Redis setup
-│   │   │   ├── controllers/      # Request handlers (User, Map, Chat, Post, Block logic)
-│   │   │   ├── middleware/       # Express middlewares (JWT Auth, Error handling)
-│   │   │   ├── models/           # Mongoose Database Schemas (User, Event, Message, etc.)
-│   │   │   ├── routes/           # Express Route definitions mapping to controllers
-│   │   │   ├── services/         # Complex business logic separated from controllers
-│   │   │   ├── socket/           # Socket.IO event handlers for real-time chat
-│   │   │   └── utils/            # Helper functions (Google Maps geocoding, Cloudinary)
-│   │   ├── .env.example          # Backend environment variables template
-│   │   └── package.json          # Backend dependencies
+│   ├── mobile/             # React Native app
+│   │   ├── android/
+│   │   ├── ios/
+│   │   └── src/
+│   │       ├── components/ # Reusable UI components
+│   │       ├── hooks/      # Custom React hooks (e.g., useLocation)
+│   │       ├── navigation/ # React Navigation stacks
+│   │       ├── screens/    # Full-page UI views
+│   │       ├── services/   # API and Socket.IO clients
+│   │       ├── store/      # Zustand state management
+│   │       ├── types/      # TypeScript interfaces
+│   │       └── utils/      # Helper functions
 │   │
-│   └── mobile/                   # React Native Mobile Application
-│       ├── android/              # Native Android code (Java/Kotlin, Gradle, Manifest)
-│       ├── ios/                  # Native iOS code (Objective-C/Swift, Pods)
-│       ├── src/
-│       │   ├── components/       # Reusable UI components (Buttons, Map Markers, Bottom Sheets)
-│       │   ├── constants/        # Theme colors, styling spacing, layout constants
-│       │   ├── hooks/            # Custom React Hooks (e.g., useLocation for background tracking)
-│       │   ├── navigation/       # React Navigation setup (MainStack, TabNavigator, AuthStack)
-│       │   ├── screens/          # Full-page UI views (organized by feature: map, profile, chat)
-│       │   ├── services/         # API client functions (Axios setup to hit backend endpoints)
-│       │   ├── store/            # Global State management (Zustand or Redux)
-│       │   └── types/            # TypeScript interfaces for Props and API responses
-│       ├── .env.example          # Mobile environment variables template
-│       └── package.json          # Mobile dependencies
-│
-├── package.json                  # Root monorepo workspace configurations
-└── README.md                     # You are here!
+│   └── backend/            # Express API
+│       └── src/
+│           ├── config/     # Environment & DB configurations
+│           ├── controllers/# Express route handlers
+│           ├── middleware/ # Auth, Validation, Error handling
+│           ├── models/     # Mongoose schemas
+│           ├── routes/     # API route definitions
+│           ├── services/   # Core business logic
+│           ├── socket/     # Socket.IO connection & event handlers
+│           └── utils/      # Shared utilities
 ```
 
 ---
 
-## ✨ Key Features
+## Prerequisites
 
-### 🗺️ Live Location & Discovery
-- **Interactive Google Maps**: Real-time map displaying nearby pets, users, and events.
-- **Live Tracking**: True background live location updates with auto-recentering map behavior.
-- **Walking Directions**: Built-in walking routes between your live location and community events.
-- **Location Search**: Integrated Google Places Autocomplete for seamless landmark and city search.
-- **Privacy Controls**: Robust block/unblock system that seamlessly filters users out of your map, events, and chats.
-
-### 💬 Social & Real-Time Communication
-- **Real-Time Chat**: End-to-end Socket.IO integration for instant direct messaging.
-- **Social Feed**: A complete social timeline to share updates, photos, and milestones of your pets.
-- **Communities & Events**: Join breed-specific or local interest groups, RSVP to meetups, and engage in community discussions.
-- **Push Notifications**: Firebase Cloud Messaging (FCM) ensures you never miss a message or event reminder.
-
-### 🎨 Premium UI/UX
-- **Interactive Onboarding**: Swipeable, animated onboarding flow to guide new users.
-- **Haptic Feedback**: Meaningful tactile feedback (vibrations) across interactions for a native feel.
-- **Responsive Animations**: Built with `react-native-reanimated` and `react-native-gesture-handler` for buttery smooth 60fps transitions.
-- **Custom Branding**: Features custom app icons for all iOS and Android densities.
+* **Node.js**: v20.x or higher recommended
+* **React Native Development Environment**: Android Studio (for Android) and/or Xcode (for iOS)
+* **MongoDB**: A local instance or MongoDB Atlas cluster
+* **Redis**: Local or Docker instance (port 6379)
+* **Firebase Project**: Configured for Authentication and Cloud Messaging (FCM)
+* **Google Cloud Project**: Maps SDK for Android/iOS, Places API, and Geocoding API enabled
+* **Agora Account**: App ID + Primary Certificate (for video calling)
+* **Gemini API Key**: For the AI chat assistant
+* **Cloudinary Account**: For handling image uploads
 
 ---
 
-## 🚀 Getting Started
+## Environment Variables
 
-### Prerequisites
+Create `.env` files in both the `apps/mobile` and `apps/backend` directories based on these templates:
 
-Ensure you have the following installed on your development machine:
-- **Node.js** >= 20.0.0
-- **npm** >= 10.0.0
-- **Docker & Docker Compose** (for easily running Redis and MongoDB locally)
-- **React Native Environment**: 
-  - Xcode (for iOS)
-  - Android Studio & Emulator (for Android)
+### Mobile (`apps/mobile/.env`)
 
-### Installation
+```env
+# IMPORTANT: Use your machine's local IP address for physical device testing.
+# Use 10.0.2.2 only if testing strictly on an Android emulator.
+API_BASE_URL=http://192.168.1.xxx:5000/api/v1
+
+EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_places_api_key
+
+AGORA_APP_ID=your_agora_app_id
+
+NODE_ENV=development
+```
+
+### Backend (`apps/backend/.env`)
+
+```env
+PORT=5000
+NODE_ENV=development
+
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/pawspace
+REDIS_URL=redis://localhost:6379
+
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nyour_key\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=your_firebase_client_email
+
+AGORA_APP_ID=your_agora_app_id
+AGORA_APP_CERTIFICATE=your_agora_app_certificate # Never expose this to the client
+
+GEMINI_API_KEY=your_gemini_api_key
+
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+```
+
+---
+
+## Getting Started
 
 1. **Clone the repository:**
    ```bash
@@ -121,96 +152,64 @@ Ensure you have the following installed on your development machine:
    cd pawspace
    ```
 
-2. **Install all dependencies:**
+2. **Install dependencies:**
+   Install for both applications.
    ```bash
-   npm install
+   cd apps/backend && npm install
+   cd ../mobile && npm install
    ```
 
-3. **Environment Setup:**
-   Create `.env` files based on the provided examples.
-   
-   **`apps/backend/.env`**
-   ```env
-   # Database & Cache
-   MONGODB_URI=mongodb+srv://...
-   REDIS_URL=redis://localhost:6379
+3. **Set up `.env` files:**
+   Configure the environment variables exactly as outlined in the section above.
 
-   # Services
-   CLOUDINARY_CLOUD_NAME=...
-   CLOUDINARY_API_KEY=...
-   CLOUDINARY_API_SECRET=...
-   GOOGLE_MAPS_API_KEY=...
-
-   # Authentication
-   JWT_SECRET=...
-   FIREBASE_PROJECT_ID=...
-   ```
-
-   **`apps/mobile/.env`**
-   ```env
-   API_BASE_URL=http://10.0.2.2:5000/api/v1 # Use localhost for iOS, 10.0.2.2 for Android Emulator
-   GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-   ```
-
-### Running the App
-
-1. **Start the Backend:**
+4. **Start the backend server:**
+   Ensure MongoDB and Redis are running locally or accessible.
    ```bash
    cd apps/backend
    npm run dev
    ```
 
-2. **Start the Mobile Packager (Metro):**
+5. **Start the Metro bundler:**
+   Open a new terminal window.
    ```bash
    cd apps/mobile
-   npm run start --reset-cache
+   npx react-native start --reset-cache
    ```
 
-3. **Launch the App:**
+6. **Run the mobile app:**
+   Open a third terminal window.
    ```bash
-   # In a new terminal window
    cd apps/mobile
-   npm run android  # For Android Emulator
-   # OR
-   npm run ios      # For iOS Simulator
+   
+   # For Android
+   npx react-native run-android
+   
+   # For iOS
+   npx react-native run-ios
    ```
 
 ---
 
-## 📦 Tech Stack
+## Important Notes for Physical Device Testing
 
-### Frontend (Mobile App)
-- **Framework**: React Native 0.73
-- **Language**: TypeScript
-- **State Management**: Redux Toolkit & React Query (`@tanstack/react-query`)
-- **Navigation**: React Navigation v7 (`@react-navigation/native-stack`)
-- **Maps**: `react-native-maps`, `@transistorsoft/react-native-background-geolocation`, & `@react-native-community/geolocation`
-- **Animations**: Reanimated v3
-
-### Backend (API Server)
-- **Framework**: Node.js & Express.js
-- **Database**: MongoDB (Mongoose)
-- **Caching**: Redis
-- **Real-Time**: Socket.IO
-- **Cloud Storage**: Cloudinary (Image uploads)
-- **Authentication**: JWT & Firebase Admin
+* **`API_BASE_URL`**: Must be your development machine's local WiFi IP (e.g., `http://192.168.1.50:5000/api/v1`), not `localhost` or `10.0.2.2`.
+* **Server Binding**: The backend Express server must listen on `0.0.0.0` (which it is currently configured to do in `server.ts`) to accept incoming LAN connections.
+* **Firewall Rules**: Windows/Mac Firewall may need an inbound rule to allow traffic on port `5000`.
+* **Network Context**: The physical phone and the development machine **must be connected to the exact same WiFi network**.
 
 ---
 
-## 🐛 Troubleshooting
+## Known Issues / Roadmap
 
-### Common Mobile Issues
+While the core functionality of PawSpace is complete, the following areas are currently under development or marked for improvement:
 
-- **Blank Map on Android**: Ensure your `GOOGLE_MAPS_API_KEY` is properly injected into `AndroidManifest.xml` via the `.env` file, and that your API key has "Maps SDK for Android" enabled in the Google Cloud Console.
-- **Location Timeout**: Android Emulators do not broadcast a GPS location by default. Use `adb emu geo fix -122.084 37.422` or the emulator's extended controls to mock a GPS signal.
-- **Metro Bundler Errors**: If you encounter `TypeError` crashes or stale code execution, always reset the Metro cache: `npx react-native start --reset-cache`.
-
-### Common Backend Issues
-
-- **Redis Connection Failed**: Ensure your local Redis server or Docker container is actively running on port 6379.
+* **Post Detail View**: The full post detail screen (`PostDetailScreen`) is currently a placeholder and needs a complete UI implementation.
+* **Community Detail View**: The community details and member management view (`CommunityDetailScreen`) requires further UI polishing.
+* **Post Action Menus**: The action sheet menu on individual post cards (e.g., for reporting or deleting a post) is pending implementation.
+* **Auth Store Cleanup**: Some dead code regarding former Clerk syncing in the `authStore` needs to be removed as the app has fully migrated to Firebase Auth.
 
 ---
 
-## 📄 License & Support
+## License & Support
 
 This project is licensed under the MIT License. For issues, feature requests, or contributions, please contact the development team or open a pull request!

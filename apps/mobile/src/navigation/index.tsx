@@ -16,6 +16,8 @@ import { socketService } from '../services/socket.service';
 import { RootStackParamList } from '../types';
 import AuthStack from './AuthStack';
 import MainStack from './MainStack';
+import IncomingCallScreen from '../screens/call/IncomingCallScreen';
+import VideoCallScreen from '../screens/call/VideoCallScreen';
 import Toast from '../components/ui/Toast';
 import { hasCompletedOnboarding } from '../utils/onboardingStorage';
 
@@ -166,6 +168,18 @@ const RootNavigator: React.FC = () => {
             initialParams={{ skipOnboarding: onboardingDone || false } as any}
           />
         )}
+
+        {/* Global Modal Screens */}
+        <Stack.Screen 
+          name="IncomingCall" 
+          component={IncomingCallScreen} 
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="VideoCall" 
+          component={VideoCallScreen} 
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
       </Stack.Navigator>
 
       {/* Global Toast overlay */}

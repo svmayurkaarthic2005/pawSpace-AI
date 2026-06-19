@@ -28,6 +28,12 @@ export interface ClientToServerEvents {
   'community:join': (communityId: string) => void;
   'community:leave': (communityId: string) => void;
   'community:typing': (payload: { communityId: string; isTyping: boolean }) => void;
+
+  // Video Calls
+  'call:invite': (payload: CallInvitePayload) => void;
+  'call:accept': (payload: { channelName: string; toUserId: string }) => void;
+  'call:reject': (payload: { channelName: string; toUserId: string; reason?: string }) => void;
+  'call:end': (payload: { channelName: string; toUserId: string }) => void;
 }
 
 // ─── Server → Client events ───────────────────────────────────────────────────
@@ -54,6 +60,12 @@ export interface ServerToClientEvents {
   'community:new_post': (payload: { post: any; communityId: string }) => void;
   'community:member_joined': (payload: { user: string; communityId: string }) => void;
   'community:user_typing': (payload: { userId: string; communityId: string; isTyping: boolean }) => void;
+
+  // Video Calls
+  'call:invite': (payload: CallInvitePayload) => void;
+  'call:accepted': (payload: { channelName: string; byUserId: string }) => void;
+  'call:rejected': (payload: { channelName: string; byUserId: string; reason?: string }) => void;
+  'call:ended': (payload: { channelName: string; byUserId: string }) => void;
 
   // Errors
   'error': (payload: { code: string; message: string }) => void;
@@ -144,4 +156,14 @@ export interface SerializedNotification {
   entityType?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+// ─── Call Payloads ────────────────────────────────────────────────────────────
+
+export interface CallInvitePayload {
+  fromUserId?: string;   // set by server when forwarding
+  toUserId: string;      // set by client when sending
+  channelName: string;
+  callerName: string;
+  callerAvatar?: string;
 }

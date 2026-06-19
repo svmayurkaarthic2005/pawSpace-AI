@@ -35,6 +35,10 @@ const envSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required'),
   FIREBASE_PRIVATE_KEY: z.string().min(1, 'FIREBASE_PRIVATE_KEY is required'),
   FIREBASE_CLIENT_EMAIL: z.string().email('FIREBASE_CLIENT_EMAIL must be a valid email'),
+
+  // Agora (video calling)
+  AGORA_APP_ID: z.string().optional().default(''),
+  AGORA_APP_CERTIFICATE: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);

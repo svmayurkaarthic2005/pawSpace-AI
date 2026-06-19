@@ -19,7 +19,8 @@ export type FCMNotificationType =
   | 'follow_request'
   | 'follow_accept'
   | 'event_reminder'
-  | 'ai_suggestion';
+  | 'ai_suggestion'
+  | 'new_post';
 
 export interface FCMNotificationData {
   type: FCMNotificationType;
@@ -91,6 +92,12 @@ const buildPayload = (data: FCMNotificationData): FCMNotificationPayload => {
         title: '✦ PawSpace AI',
         body: data.preview ?? 'New AI insight for your pet',
         data: { type: 'ai_suggestion', feature: data.feature ?? '' },
+      };
+    case 'new_post':
+      return {
+        title: '📸 New post',
+        body: `${data.senderName ?? 'Someone'} published a new post`,
+        data: { type: 'new_post', postId: data.postId ?? '' },
       };
     default:
       return { title: 'PawSpace', body: 'You have a new notification' };

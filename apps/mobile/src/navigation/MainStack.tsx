@@ -2,14 +2,17 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { socketService, CallInvitePayload } from '../services/socket.service';
 import {
   MainTabParamList,
   FeedStackParamList,
   ExploreStackParamList,
   EventsStackParamList,
   ProfileStackParamList,
+  RootStackParamList,
 } from '../types';
 
 // ─── Screens ──────────────────────────────────────────────────────────────────
@@ -123,8 +126,8 @@ const EventsNavigator = () => (
   <EventsStack.Navigator screenOptions={{ headerShown: false }}>
     <EventsStack.Screen name="MapDiscovery" component={MapDiscoveryScreen} />
     <EventsStack.Screen name="EventDetail" component={EventDetailScreen as any} />
-    <EventsStack.Screen 
-      name="CreateEvent" 
+    <EventsStack.Screen
+      name="CreateEvent"
       component={CreateEventScreen}
       options={{ presentation: 'modal' }}
     />
@@ -165,70 +168,91 @@ const TAB_ICONS: Record<string, { active: string; inactive: string; library?: 'i
 
 const MainStack: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  // Following the design from the image strictly
-  const tabBg = '#0D0D1A'; // Very dark navy/black background
-  const tabBorder = 'rgba(255,255,255,0.05)'; // Subtle border
-  const activeColor = '#7C3AED'; // Purple/violet for active state
-  const inactiveColor = '#6B7280'; // Gray for inactive state
+  // ─── Global Call Listener ───────────────────────────────────────────────────
+  React.useEffect(() => {
+    const handleIncomingCall = (payload: CallInvitePayload) => {
+      navigation.navigate('IncomingCall', {
+        channelName: payload.channelName,
+        fromUserId: payload.fromUserId || '',
+        callerName: payload.callerName,
+        callerAvatar: payload.callerAvatar,
+      });
+    };
+
+    socketService.on('call:invite', handleIncomingCall);
+    return () => {
+      socketService.off('call:invite', handleIncomingCall);
+    };
+  }, [navigation]);
+
+  const tabBg = '#0D0D1A';
+  const tabBorder = 'rgba(255,255,255,0.05)';
+  const activeColor = '#7C3AED';
+  const inactiveColor = '#6B7280';
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: tabBg,
-          borderTopColor: tabBorder,
-          borderTopWidth: 0.5,
-          height: 65 + insets.bottom,
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 8,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarActiveTintColor: activeColor,
-        tabBarInactiveTintColor: inactiveColor,
-        tabBarIcon: ({ focused, color }) => {
-          if (route.name === 'Create') {
+      screenOptions={({ route }) => {
+        const routeName = getFocusedRouteNameFromRoute(route) ?? '';
+        const hideTabBar = ['ChatRoom', 'NewChat', 'CommunityDetail'].includes(routeName);
+
+        return {
+          headerShown: false,
+          tabBarStyle: {
+            display: hideTabBar ? 'none' : 'flex',
+            backgroundColor: tabBg,
+            borderTopColor: tabBorder,
+            borderTopWidth: 0.5,
+            height: 65 + insets.bottom,
+            paddingBottom: insets.bottom + 8,
+            paddingTop: 8,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarActiveTintColor: activeColor,
+          tabBarInactiveTintColor: inactiveColor,
+          tabBarIcon: ({ focused, color }) => {
+            if (route.name === 'Create') {
+              return (
+                <View style={styles.createBtn}>
+                  <Icon name="add" size={32} color="#FFFFFF" />
+                </View>
+              );
+            }
+            const icons = TAB_ICONS[route.name];
+            const iconName = focused ? icons?.active : icons?.inactive;
             return (
-              <View style={styles.createBtn}>
-                <Icon name="add" size={32} color="#FFFFFF" />
-              </View>
+              <Icon
+                name={iconName || 'home-outline'}
+                size={26}
+                color={color}
+              />
             );
-          }
-          const icons = TAB_ICONS[route.name];
-          const iconName = focused ? icons?.active : icons?.inactive;
-          
-          return (
-            <Icon 
-              name={iconName || 'home-outline'} 
-              size={26} 
-              color={color}
-            />
-          );
-        },
-        tabBarLabel: ({ focused, color }) => {
-          if (route.name === 'Create') return null;
-          // Map internal route names to display labels matching the design
-          const labelMap: Record<string, string> = {
-            Feed: 'Home',
-            Explore: 'Discover',
-            Events: 'Events',
-            Profile: 'Profile',
-          };
-          const label = labelMap[route.name] || route.name;
-          return (
-            <Text style={{ 
-              fontSize: 11, 
-              color, 
-              fontWeight: focused ? '600' : '400',
-              marginTop: 4,
-            }}>
-              {label}
-            </Text>
-          );
-        },
-      })}
+          },
+          tabBarLabel: ({ focused, color }) => {
+            if (route.name === 'Create') return null;
+            const labelMap: Record<string, string> = {
+              Feed: 'Home',
+              Explore: 'Discover',
+              Events: 'Events',
+              Profile: 'Profile',
+            };
+            const label = labelMap[route.name] || route.name;
+            return (
+              <Text style={{
+                fontSize: 11,
+                color,
+                fontWeight: focused ? '600' : '400',
+                marginTop: 4,
+              }}>
+                {label}
+              </Text>
+            );
+          },
+        };
+      }}
     >
       <Tab.Screen name="Feed" component={FeedNavigator} />
       <Tab.Screen name="Explore" component={ExploreNavigator} />
@@ -237,7 +261,6 @@ const MainStack: React.FC = () => {
         component={CreatePostScreen}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Prevent navigating to the Create tab — open as modal instead
             e.preventDefault();
             (navigation as any).navigate('Feed', {
               screen: 'CreatePost',

@@ -46,7 +46,7 @@ const FollowersListScreen: React.FC = () => {
     queryKey: ['followers', userId],
     queryFn: async () => {
       const { data } = await api.get(`/follows/users/${userId}/followers`);
-      return data.data;
+      return data.data?.items?.map((item: any) => item.follower) || [];
     },
     enabled: !!userId,
   });
@@ -56,7 +56,10 @@ const FollowersListScreen: React.FC = () => {
     queryKey: ['following', userId],
     queryFn: async () => {
       const { data } = await api.get(`/follows/users/${userId}/following`);
-      return data.data;
+      return data.data?.users?.map((user: any) => ({
+        ...user,
+        isFollowing: isCurrentUserProfile,
+      })) || [];
     },
     enabled: !!userId,
   });

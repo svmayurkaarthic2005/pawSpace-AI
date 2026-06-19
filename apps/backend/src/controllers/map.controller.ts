@@ -7,7 +7,6 @@ import { Follow } from '../models/follow.model';
 import { getPlaceAutocomplete, getDirections } from '../utils/googleMaps.util';
 import { redis } from '../config/redis';
 import { Block } from '../models/block.model';
-import mongoose from 'mongoose';
 
 export const getNearbyEvents = async (req: Request, res: Response): Promise<void> => {
   try {

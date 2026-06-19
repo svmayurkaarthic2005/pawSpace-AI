@@ -49,6 +49,16 @@ export interface SerializedNotification {
 
 export type ConnectionState = 'connected' | 'disconnected' | 'reconnecting';
 
+// ─── Call payload types ───────────────────────────────────────────────────────
+
+export interface CallInvitePayload {
+  fromUserId?: string;
+  toUserId: string;
+  channelName: string;
+  callerName: string;
+  callerAvatar?: string;
+}
+
 // ─── Typed event maps ─────────────────────────────────────────────────────────
 
 interface ServerToClientEvents {
@@ -65,6 +75,11 @@ interface ServerToClientEvents {
   'notification:count_update': (payload: { count: number }) => void;
   'user:online': (payload: { userId: string; socketId: string }) => void;
   'user:offline': (payload: { userId: string; lastSeen: string }) => void;
+  // Call events
+  'call:invite': (payload: CallInvitePayload) => void;
+  'call:accepted': (payload: { channelName: string; byUserId: string }) => void;
+  'call:rejected': (payload: { channelName: string; byUserId: string; reason?: string }) => void;
+  'call:ended': (payload: { channelName: string; byUserId: string }) => void;
   'error': (payload: { code: string; message: string }) => void;
 }
 
@@ -84,6 +99,11 @@ interface ClientToServerEvents {
     userIds: string[],
     callback: (statuses: PresenceStatus[]) => void,
   ) => void;
+  // Call events
+  'call:invite': (payload: CallInvitePayload) => void;
+  'call:accept': (payload: { channelName: string; toUserId: string }) => void;
+  'call:reject': (payload: { channelName: string; toUserId: string; reason?: string }) => void;
+  'call:end': (payload: { channelName: string; toUserId: string }) => void;
 }
 
 // ─── SocketService singleton ──────────────────────────────────────────────────
@@ -374,6 +394,24 @@ class SocketService {
       }
       this.emit('presence:check', userIds, resolve);
     });
+  }
+
+  // ── Call helpers ───────────────────────────────────────────────────────────
+
+  inviteCall(payload: CallInvitePayload): void {
+    this.emit('call:invite', payload);
+  }
+
+  acceptCall(channelName: string, toUserId: string): void {
+    this.emit('call:accept', { channelName, toUserId });
+  }
+
+  rejectCall(channelName: string, toUserId: string, reason?: string): void {
+    this.emit('call:reject', { channelName, toUserId, reason });
+  }
+
+  endCall(channelName: string, toUserId: string): void {
+    this.emit('call:end', { channelName, toUserId });
   }
 
   // ── Singleton getter ───────────────────────────────────────────────────────

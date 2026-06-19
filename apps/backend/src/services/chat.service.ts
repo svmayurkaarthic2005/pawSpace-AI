@@ -105,7 +105,6 @@ export class ChatService {
     await message.save();
 
     // Update chat metadata
-    const recipientId = chat.participants.find((p) => p.toString() !== senderId)?.toString();
 
     const unreadUpdate: Record<string, unknown> = {
       lastMessage: message._id,

@@ -1,4 +1,15 @@
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  sendPasswordResetEmail, 
+  updateProfile, 
+  updateEmail, 
+  updatePassword,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  FirebaseAuthTypes 
+} from '@react-native-firebase/auth';
 
 /**
  * Firebase Authentication Service
@@ -14,7 +25,7 @@ export class FirebaseAuthService {
     password: string
   ): Promise<FirebaseAuthTypes.UserCredential> {
     try {
-      return await auth().signInWithEmailAndPassword(email, password);
+      return await signInWithEmailAndPassword(getAuth(), email, password);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to sign in');
     }
@@ -28,7 +39,7 @@ export class FirebaseAuthService {
     password: string
   ): Promise<FirebaseAuthTypes.UserCredential> {
     try {
-      return await auth().createUserWithEmailAndPassword(email, password);
+      return await createUserWithEmailAndPassword(getAuth(), email, password);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to create user');
     }
@@ -39,7 +50,7 @@ export class FirebaseAuthService {
    */
   static async signOut(): Promise<void> {
     try {
-      await auth().signOut();
+      await firebaseSignOut(getAuth());
     } catch (error: any) {
       throw new Error(error.message || 'Failed to sign out');
     }
@@ -49,7 +60,7 @@ export class FirebaseAuthService {
    * Get current user
    */
   static getCurrentUser(): FirebaseAuthTypes.User | null {
-    return auth().currentUser;
+    return getAuth().currentUser;
   }
 
   /**
@@ -57,7 +68,7 @@ export class FirebaseAuthService {
    */
   static async sendPasswordResetEmail(email: string): Promise<void> {
     try {
-      await auth().sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(getAuth(), email);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to send password reset email');
     }
@@ -71,9 +82,9 @@ export class FirebaseAuthService {
     photoURL?: string;
   }): Promise<void> {
     try {
-      const user = auth().currentUser;
+      const user = getAuth().currentUser;
       if (!user) throw new Error('No user signed in');
-      await user.updateProfile(updates);
+      await updateProfile(user, updates);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update profile');
     }
@@ -84,9 +95,9 @@ export class FirebaseAuthService {
    */
   static async updateEmail(newEmail: string): Promise<void> {
     try {
-      const user = auth().currentUser;
+      const user = getAuth().currentUser;
       if (!user) throw new Error('No user signed in');
-      await user.updateEmail(newEmail);
+      await updateEmail(user, newEmail);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update email');
     }
@@ -97,9 +108,9 @@ export class FirebaseAuthService {
    */
   static async updatePassword(newPassword: string): Promise<void> {
     try {
-      const user = auth().currentUser;
+      const user = getAuth().currentUser;
       if (!user) throw new Error('No user signed in');
-      await user.updatePassword(newPassword);
+      await updatePassword(user, newPassword);
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update password');
     }
@@ -110,7 +121,7 @@ export class FirebaseAuthService {
    */
   static async getIdToken(forceRefresh = false): Promise<string> {
     try {
-      const user = auth().currentUser;
+      const user = getAuth().currentUser;
       if (!user) throw new Error('No user signed in');
       return await user.getIdToken(forceRefresh);
     } catch (error: any) {
@@ -124,7 +135,7 @@ export class FirebaseAuthService {
   static onAuthStateChanged(
     callback: (user: FirebaseAuthTypes.User | null) => void
   ) {
-    return auth().onAuthStateChanged(callback);
+    return firebaseOnAuthStateChanged(getAuth(), callback);
   }
 }
 

@@ -14,7 +14,8 @@ export type NotificationType =
   | 'chat'
   | 'rsvp'
   | 'ai_suggestion'
-  | 'community_post';
+  | 'community_post'
+  | 'new_post';
 
 export interface INotification extends Document {
   _id: mongoose.Types.ObjectId;
@@ -51,7 +52,7 @@ const notificationSchema = new Schema<INotification, INotificationModel>(
     },
     type: {
       type: String,
-      enum: ['like', 'comment', 'follow', 'follow_request', 'follow_accept', 'pet_follow', 'event_invite', 'event_rsvp', 'chat', 'rsvp', 'ai_suggestion', 'community_post'],
+      enum: ['like', 'comment', 'follow', 'follow_request', 'follow_accept', 'pet_follow', 'event_invite', 'event_rsvp', 'chat', 'rsvp', 'ai_suggestion', 'community_post', 'new_post'],
       required: [true, 'Notification type is required'],
     },
     entityId: {

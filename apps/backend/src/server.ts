@@ -27,6 +27,7 @@ import googlePlacesRoutes from './routes/googlePlaces.routes';
 import exploreRoutes from './routes/explore.routes';
 import notificationRoutes from './routes/notification.routes';
 import mapRoutes from './routes/map.routes';
+import agoraRoutes from './routes/agora.routes';
 import { createSocketServer, setIO } from './socket/socket';
 
 // ─── App Setup ────────────────────────────────────────────────────────────────
@@ -172,6 +173,7 @@ app.use('/api/v1/explore', exploreRoutes);
 app.use('/api/v1/search', exploreRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/map', mapRoutes);
+app.use('/api/v1/agora', agoraRoutes);
 app.use('/api/v1', discoveryRoutes);
 
 // ─── 404 & Error Handlers ─────────────────────────────────────────────────────

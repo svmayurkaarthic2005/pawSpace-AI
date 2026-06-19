@@ -82,6 +82,25 @@ export class PostService {
       cacheService.invalidateFollowerFeeds(userId, 'User'),
     ]);
 
+    // Fire-and-forget notifications to all followers
+    followRepository.getFollowerIds(userId, 'User').then(async (followerIds) => {
+      const batchSize = 100;
+      for (let i = 0; i < followerIds.length; i += batchSize) {
+        const batch = followerIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (followerId) => {
+          await notificationService.createNotification({
+            recipient: followerId,
+            sender: userId,
+            type: 'new_post',
+            entityId: post._id.toString(),
+            entityType: 'Post',
+            entityImage: post.media[0]?.url,
+            entityName: post.caption?.slice(0, 50),
+          }).catch(err => console.error('[createPost] Notification error:', err));
+        }));
+      }
+    }).catch(err => console.error('[createPost] Failed to notify followers:', err));
+
     return post;
   }
 

@@ -167,6 +167,19 @@ export interface ChatItem {
 export type RootStackParamList = {
   Auth: { skipOnboarding?: boolean } | undefined;
   Main: undefined;
+  IncomingCall: {
+    channelName: string;
+    fromUserId: string;
+    callerName: string;
+    callerAvatar?: string;
+  };
+  VideoCall: {
+    channelName: string;
+    remoteUserId: string;
+    remoteUserName: string;
+    remoteUserAvatar?: string;
+    isCaller: boolean;
+  };
 };
 
 export type AuthStackParamList = {

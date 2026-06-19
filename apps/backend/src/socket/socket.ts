@@ -8,6 +8,7 @@ import { registerChatHandlers } from './handlers/chat.handler';
 import { registerNotificationHandlers } from './handlers/notification.handler';
 import { registerPresenceHandlers, broadcastOnline, broadcastOffline } from './handlers/presence.handler';
 import { setupCommunityHandlers } from './handlers/community.handler';
+import { registerCallHandlers } from './handlers/call.handler';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
@@ -97,6 +98,7 @@ export const createSocketServer = (
     registerNotificationHandlers(io, authedSocket);
     registerPresenceHandlers(io, authedSocket);
     setupCommunityHandlers(authedSocket);
+    registerCallHandlers(io, authedSocket);
 
     // ── Disconnect ───────────────────────────────────────────────────────────
 

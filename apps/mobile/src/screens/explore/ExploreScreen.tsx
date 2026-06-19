@@ -52,6 +52,8 @@ export const ExploreScreen: React.FC = () => {
   const isMountedRef = useRef(true);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSuggestionsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Each search gets a unique ID; only the latest one can update state
+  const searchIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -144,7 +146,9 @@ export const ExploreScreen: React.FC = () => {
   const handleSearch = async () => {
     if (!query.trim()) return;
 
-    const currentQuery = query; // Capture current query to prevent race conditions
+    // Increment and capture this search's unique ID
+    const thisSearchId = ++searchIdRef.current;
+    const currentQuery = query;
 
     Keyboard.dismiss();
     setIsSearching(true);
@@ -163,8 +167,8 @@ export const ExploreScreen: React.FC = () => {
         userLocation,
       });
 
-      // Only update state if component is still mounted and query hasn't changed
-      if (isMountedRef.current && query === currentQuery) {
+      // Only update state if this is still the most recent search and component is mounted
+      if (isMountedRef.current && thisSearchId === searchIdRef.current) {
         setParsedIntent(response.intent);
         setSearchResults(response.results);
         setNoResultsSuggestion(response.suggestion);
@@ -172,13 +176,13 @@ export const ExploreScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Search error:', error);
-      // Only show error if component is still mounted and query hasn't changed
-      if (isMountedRef.current && query === currentQuery) {
+      if (isMountedRef.current && thisSearchId === searchIdRef.current) {
         setSearchResults({ posts: [], events: [], communities: [], users: [] });
         setNoResultsSuggestion('Search failed. Please try again.');
       }
     } finally {
-      if (isMountedRef.current) {
+      // Only clear loading state if this is still the current search
+      if (isMountedRef.current && thisSearchId === searchIdRef.current) {
         setIsSearching(false);
       }
     }

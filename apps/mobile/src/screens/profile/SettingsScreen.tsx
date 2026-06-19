@@ -363,33 +363,33 @@ const SettingsScreen: React.FC = () => {
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Profile Card */}
-        <View style={styles.profileCard}>
+        <TouchableOpacity style={styles.profileCard} onPress={handleEditProfile} activeOpacity={0.7}>
           <View style={styles.profileLeft}>
             <View style={styles.avatarContainer}>
-              {user?.avatarUrl ? (
-                <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+              {(user as any)?.avatar ? (
+                <Image source={{ uri: (user as any).avatar }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <Text style={styles.avatarInitials}>
-                    {user?.displayName?.charAt(0).toUpperCase() || 'U'}
+                    {((user as any)?.name || user?.username || 'U').charAt(0).toUpperCase()}
                   </Text>
                 </View>
               )}
-              <View style={styles.verifiedDot} />
+              {(user as any)?.isVerified && <View style={styles.verifiedDot} />}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{user?.displayName || 'User'}</Text>
+              <Text style={styles.profileName}>{(user as any)?.name || user?.username || 'User'}</Text>
               <Text style={styles.profileMeta}>
-                @{user?.username} · {user?.locationName || 'Location'}
+                @{user?.username}{(user as any)?.locationName ? ` · ${(user as any).locationName}` : ''}
               </Text>
-              <TouchableOpacity style={styles.editProfileBtn} onPress={handleEditProfile}>
+              <View style={styles.editProfileBtn}>
                 <Icon name="pencil" size={12} color={COLORS.primary} />
                 <Text style={styles.editProfileText}>Edit profile</Text>
-              </TouchableOpacity>
+              </View>
             </View>
           </View>
           <Icon name="chevron-forward" size={20} color="#6B7280" />
-        </View>
+        </TouchableOpacity>
 
 
 
@@ -758,7 +758,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 52,
+    minHeight: 56,
+    paddingVertical: 10,
     paddingHorizontal: SPACING.md,
   },
   settingLeft: {

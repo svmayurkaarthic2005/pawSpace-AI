@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Modal,
   PermissionsAndroid,
   ToastAndroid,
 } from 'react-native';
@@ -17,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { launchImageLibrary } from 'react-native-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
+// Pure-JS date/time picker — no native module required
 import Icon from 'react-native-vector-icons/Ionicons';
 import FastImage from 'react-native-fast-image';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -47,12 +48,12 @@ const CreateEventScreen: React.FC = () => {
   const [coverImage, setCoverImage] = useState<{ uri: string; type: string; name: string } | null>(null);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  // Custom pure-JS date/time picker
+  const [datePickerTarget, setDatePickerTarget] = useState<'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
+  const [pickerTemp, setPickerTemp] = useState({ month: 1, day: 1, year: 2025, hour: 0, minute: 0 });
   const [selectedSpecies, setSelectedSpecies] = useState<string[]>([]);
   const [maxAttendees, setMaxAttendees] = useState('');
+  const [tags, setTags] = useState('');
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: 13.0827,
@@ -418,28 +419,26 @@ const CreateEventScreen: React.FC = () => {
           <View style={styles.dateTimeRow}>
             <TouchableOpacity
               style={styles.dateTimeButton}
-              onPress={() => setShowStartDatePicker(true)}
+              onPress={() => {
+                setPickerTemp({ month: startDate.getMonth() + 1, day: startDate.getDate(), year: startDate.getFullYear(), hour: startDate.getHours(), minute: startDate.getMinutes() });
+                setDatePickerTarget('startDate');
+              }}
             >
               <Icon name="calendar-outline" size={20} color="#7C3AED" />
               <Text style={styles.dateTimeButtonText}>
-                {startDate.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
+                {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dateTimeButton}
-              onPress={() => setShowStartTimePicker(true)}
+              onPress={() => {
+                setPickerTemp({ month: startDate.getMonth() + 1, day: startDate.getDate(), year: startDate.getFullYear(), hour: startDate.getHours(), minute: startDate.getMinutes() });
+                setDatePickerTarget('startTime');
+              }}
             >
               <Icon name="time-outline" size={20} color="#7C3AED" />
               <Text style={styles.dateTimeButtonText}>
-                {startDate.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                })}
+                {startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -451,28 +450,26 @@ const CreateEventScreen: React.FC = () => {
           <View style={styles.dateTimeRow}>
             <TouchableOpacity
               style={styles.dateTimeButton}
-              onPress={() => setShowEndDatePicker(true)}
+              onPress={() => {
+                setPickerTemp({ month: endDate.getMonth() + 1, day: endDate.getDate(), year: endDate.getFullYear(), hour: endDate.getHours(), minute: endDate.getMinutes() });
+                setDatePickerTarget('endDate');
+              }}
             >
               <Icon name="calendar-outline" size={20} color="#7C3AED" />
               <Text style={styles.dateTimeButtonText}>
-                {endDate.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
+                {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dateTimeButton}
-              onPress={() => setShowEndTimePicker(true)}
+              onPress={() => {
+                setPickerTemp({ month: endDate.getMonth() + 1, day: endDate.getDate(), year: endDate.getFullYear(), hour: endDate.getHours(), minute: endDate.getMinutes() });
+                setDatePickerTarget('endTime');
+              }}
             >
               <Icon name="time-outline" size={20} color="#7C3AED" />
               <Text style={styles.dateTimeButtonText}>
-                {endDate.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                })}
+                {endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -534,53 +531,121 @@ const CreateEventScreen: React.FC = () => {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* Date/Time Pickers */}
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setShowStartDatePicker(false);
-            if (date) setStartDate(date);
-          }}
-          minimumDate={new Date()}
-        />
-      )}
-      {showStartTimePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="time"
-          display="default"
-          onChange={(event, date) => {
-            setShowStartTimePicker(false);
-            if (date) setStartDate(date);
-          }}
-        />
-      )}
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={endDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setShowEndDatePicker(false);
-            if (date) setEndDate(date);
-          }}
-          minimumDate={startDate}
-        />
-      )}
-      {showEndTimePicker && (
-        <DateTimePicker
-          value={endDate}
-          mode="time"
-          display="default"
-          onChange={(event, date) => {
-            setShowEndTimePicker(false);
-            if (date) setEndDate(date);
-          }}
-        />
-      )}
+      {/* Pure-JS Date/Time Picker Modal */}
+      <Modal visible={datePickerTarget !== null} transparent animationType="fade">
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerContainer}>
+            <Text style={styles.pickerTitle}>
+              {datePickerTarget === 'startDate' ? 'Start Date'
+                : datePickerTarget === 'startTime' ? 'Start Time'
+                : datePickerTarget === 'endDate' ? 'End Date'
+                : 'End Time'}
+            </Text>
+
+            {(datePickerTarget === 'startDate' || datePickerTarget === 'endDate') ? (
+              <View style={styles.pickerRow}>
+                {/* Month */}
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerLabel}>Month</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, month: p.month < 12 ? p.month + 1 : 1 }))}>
+                    <Icon name="chevron-up" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValue}>
+                    {new Date(pickerTemp.year, pickerTemp.month - 1).toLocaleString('en-US', { month: 'short' })}
+                  </Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, month: p.month > 1 ? p.month - 1 : 12 }))}>
+                    <Icon name="chevron-down" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+                {/* Day */}
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerLabel}>Day</Text>
+                  <TouchableOpacity onPress={() => {
+                    const max = new Date(pickerTemp.year, pickerTemp.month, 0).getDate();
+                    setPickerTemp(p => ({ ...p, day: p.day < max ? p.day + 1 : 1 }));
+                  }}>
+                    <Icon name="chevron-up" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValue}>{String(pickerTemp.day).padStart(2, '0')}</Text>
+                  <TouchableOpacity onPress={() => {
+                    const max = new Date(pickerTemp.year, pickerTemp.month, 0).getDate();
+                    setPickerTemp(p => ({ ...p, day: p.day > 1 ? p.day - 1 : max }));
+                  }}>
+                    <Icon name="chevron-down" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+                {/* Year */}
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerLabel}>Year</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, year: p.year + 1 }))}>
+                    <Icon name="chevron-up" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValue}>{pickerTemp.year}</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, year: p.year > new Date().getFullYear() ? p.year - 1 : p.year }))}>
+                    <Icon name="chevron-down" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.pickerRow}>
+                {/* Hour */}
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerLabel}>Hour</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, hour: p.hour < 23 ? p.hour + 1 : 0 }))}>
+                    <Icon name="chevron-up" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValue}>{String(pickerTemp.hour).padStart(2, '0')}</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, hour: p.hour > 0 ? p.hour - 1 : 23 }))}>
+                    <Icon name="chevron-down" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+                {/* Minute */}
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerLabel}>Minute</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, minute: p.minute < 59 ? p.minute + 1 : 0 }))}>
+                    <Icon name="chevron-up" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                  <Text style={styles.pickerValue}>{String(pickerTemp.minute).padStart(2, '0')}</Text>
+                  <TouchableOpacity onPress={() => setPickerTemp(p => ({ ...p, minute: p.minute > 0 ? p.minute - 1 : 59 }))}>
+                    <Icon name="chevron-down" size={22} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.pickerButtons}>
+              <TouchableOpacity style={styles.pickerCancelBtn} onPress={() => setDatePickerTarget(null)}>
+                <Text style={styles.pickerCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pickerConfirmBtn}
+                onPress={() => {
+                  if (datePickerTarget === 'startDate') {
+                    const d = new Date(startDate);
+                    d.setFullYear(pickerTemp.year, pickerTemp.month - 1, pickerTemp.day);
+                    setStartDate(d);
+                  } else if (datePickerTarget === 'startTime') {
+                    const d = new Date(startDate);
+                    d.setHours(pickerTemp.hour, pickerTemp.minute);
+                    setStartDate(d);
+                  } else if (datePickerTarget === 'endDate') {
+                    const d = new Date(endDate);
+                    d.setFullYear(pickerTemp.year, pickerTemp.month - 1, pickerTemp.day);
+                    setEndDate(d);
+                  } else if (datePickerTarget === 'endTime') {
+                    const d = new Date(endDate);
+                    d.setHours(pickerTemp.hour, pickerTemp.minute);
+                    setEndDate(d);
+                  }
+                  setDatePickerTarget(null);
+                }}
+              >
+                <Text style={styles.pickerConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Map Picker Modal */}
       <Modal visible={showMapPicker} animationType="slide" transparent={false}>
@@ -892,6 +957,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmMapText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+  },
+  // ── Custom Date/Time Picker ────────────────────────────────────────────────
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerContainer: {
+    backgroundColor: '#1A1A2E',
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.3)',
+  },
+  pickerTitle: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginBottom: 24,
+  },
+  pickerCol: {
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 72,
+  },
+  pickerLabel: {
+    color: '#6B7280',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerValue: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '700',
+    minWidth: 56,
+    textAlign: 'center',
+  },
+  pickerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pickerCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  pickerCancelText: {
+    color: '#9CA3AF',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
+  pickerConfirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+  },
+  pickerConfirmText: {
     color: '#FFFFFF',
     fontSize: FONT_SIZE.md,
     fontWeight: '700',

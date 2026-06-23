@@ -107,7 +107,7 @@ const MapDiscoveryScreen: React.FC = () => {
       // Cleanup watch on unmount
       if (watchIdRef.current !== null) {
         console.log('🛑 MapDiscoveryScreen: Clearing location watch:', watchIdRef.current);
-        Geolocation.clearWatch(watchIdRef.current);
+        location.stopWatching(watchIdRef.current);
         watchIdRef.current = null;
       }
     };
@@ -323,10 +323,18 @@ const MapDiscoveryScreen: React.FC = () => {
       />
 
       {!location.granted && !location.denied && !location.blocked && (
-        <LocationPermissionModal onAllow={location.requestPermission} />
+        <LocationPermissionModal 
+          onAllow={location.requestPermission} 
+          onSkip={location.skipPermission}
+        />
       )}
 
-      {(location.denied || location.blocked) && <LocationDeniedBanner blocked={location.blocked} />}
+      {(location.denied || location.blocked) && (
+        <LocationDeniedBanner 
+          blocked={location.blocked} 
+          onEnable={location.requestPermission}
+        />
+      )}
 
       {location.granted && !location.coords && (
         <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>

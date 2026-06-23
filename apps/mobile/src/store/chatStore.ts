@@ -50,23 +50,29 @@ export const useChatStore = create<ChatState>((set) => ({
   mergeMessages: (chatId, newMessages) =>
     set((state) => {
       const existing = state.messages[chatId] || [];
-      const msgMap = new Map();
-      
-      // Preserve existing messages
+      const msgMap = new Map<string, SerializedMessage>();
+
+      // Index existing messages by _id
       existing.forEach(m => msgMap.set(m._id, m));
-      
-      // Merge new messages from React Query, preserving optimistic or newer socket ones
+
+      // Build a set of all tempIds already tracked (optimistic messages)
+      const trackedTempIds = new Set(
+        existing.filter(m => m.tempId).map(m => m.tempId!)
+      );
+
+      // Merge server messages, skip any whose ID is already a known tempId
+      // (prevents re-adding a message that was just confirmed optimistically)
       newMessages.forEach(m => {
-        if (!msgMap.has(m._id)) {
-           msgMap.set(m._id, m);
+        if (!msgMap.has(m._id) && !trackedTempIds.has(m._id)) {
+          msgMap.set(m._id, m);
         }
       });
-      
+
       // Sort descending (newest first)
-      const merged = Array.from(msgMap.values()).sort((a, b) => 
+      const merged = Array.from(msgMap.values()).sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      
+
       return {
         messages: { ...state.messages, [chatId]: merged },
       };
@@ -75,20 +81,30 @@ export const useChatStore = create<ChatState>((set) => ({
   addMessage: (chatId, message) =>
     set((state) => {
       const existing = state.messages[chatId] || [];
-      
-      // Check for duplicates by _id or tempId
-      const isDuplicate = existing.some(
-        (m) => 
-          m._id === message._id || 
-          (message.tempId && m.tempId === message.tempId) ||
-          (message.tempId && m._id === message.tempId) ||
-          (m.tempId && message._id === m.tempId)
-      );
-      
-      if (isDuplicate) {
+
+      // Exact duplicate by real _id
+      if (existing.some(m => m._id === message._id && !message.tempId)) {
         return state;
       }
-      
+
+      // Check if this incoming confirmed message matches an optimistic (tempId) message.
+      // If so, REPLACE the optimistic entry rather than adding a duplicate.
+      const optimisticIndex = existing.findIndex(
+        m =>
+          (message.tempId && m._id === message.tempId) || // optimistic _id === incoming tempId
+          (m.tempId && m.tempId === message.tempId) ||    // same tempId
+          (m.tempId && m.tempId === message._id)          // optimistic _id is the real _id (shouldn't happen but guard)
+      );
+
+      if (optimisticIndex !== -1) {
+        // Replace optimistic entry with confirmed message
+        const updated = [...existing];
+        updated[optimisticIndex] = { ...message, tempId: undefined };
+        return {
+          messages: { ...state.messages, [chatId]: updated },
+        };
+      }
+
       return {
         messages: {
           ...state.messages,

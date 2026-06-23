@@ -14,7 +14,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
 import { socketService } from '../../services/socket.service';
 import { useAuthStore } from '../../store/authStore';
-import { useChatStore } from '../../store/chatStore';
 import { useAsyncStorageState } from '../../hooks/useAsyncStorageState';
 import { ChatListHeader } from '../../components/chat/ChatListHeader';
 import { AIBanner } from '../../components/chat/AIBanner';
@@ -26,10 +25,7 @@ export const ChatListScreen: React.FC = () => {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const { currentActiveChatId } = useChatStore();
-
-  // Helper to get user ID (backend uses _id, frontend type uses id)
-  const getUserId = () => (user as any)?._id || user?.id;
+  const userId = (user as any)?._id || user?.id;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -89,10 +85,17 @@ export const ChatListScreen: React.FC = () => {
     };
 
     const handleNewMessage = ({ chatId }: any) => {
-      // Only update if user is NOT currently viewing this chat
-      if (currentActiveChatId !== chatId) {
-        queryClient.invalidateQueries({ queryKey: ['chats'] });
-      }
+      // Don't trigger a network refetch on every message —
+      // chat:list_update already keeps the list fresh via cache mutation.
+      // Only refetch if somehow the chat isn't in the list yet.
+      queryClient.setQueryData(['chats'], (old: any) => {
+        if (!old) return old;
+        const exists = old.some((c: any) => c._id === chatId);
+        if (!exists) {
+          queryClient.invalidateQueries({ queryKey: ['chats'] });
+        }
+        return old;
+      });
     };
 
     socketService.on('chat:list_update', handleChatListUpdate);
@@ -102,7 +105,7 @@ export const ChatListScreen: React.FC = () => {
       socketService.off('chat:list_update', handleChatListUpdate);
       socketService.off('chat:message', handleNewMessage);
     };
-  }, [queryClient, currentActiveChatId]);
+  }, [queryClient]);
 
   const openChat = useCallback(
     (chat: any) => {
@@ -147,13 +150,13 @@ export const ChatListScreen: React.FC = () => {
     ({ item }: any) => (
       <SwipeableChatRow
         chat={item}
-        currentUserId={getUserId()}
+        currentUserId={userId}
         onPress={() => openChat(item)}
         onMute={() => handleMute(item._id)}
         onDelete={() => handleDelete(item._id)}
       />
     ),
-    [user, openChat, handleMute, handleDelete],
+    [userId, openChat, handleMute, handleDelete],
   );
 
   const renderHeader = useCallback(

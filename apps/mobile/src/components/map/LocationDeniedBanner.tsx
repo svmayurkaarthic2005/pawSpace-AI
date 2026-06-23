@@ -4,19 +4,26 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 interface LocationDeniedBannerProps {
   blocked: boolean;
+  onEnable?: () => void;
 }
 
-const LocationDeniedBanner: React.FC<LocationDeniedBannerProps> = ({ blocked }) => {
+const LocationDeniedBanner: React.FC<LocationDeniedBannerProps> = ({ blocked, onEnable }) => {
   return (
     <View style={styles.deniedBanner}>
       <Icon name="warning" color="#EF9F27" size={16} />
       <Text style={styles.deniedText}>
         {blocked ? 'Location blocked. Enable in Settings.' : 'Location needed to see nearby results.'}
       </Text>
-      {blocked && (
+      {blocked ? (
         <TouchableOpacity onPress={() => Linking.openSettings()}>
           <Text style={styles.openSettings}>Open Settings</Text>
         </TouchableOpacity>
+      ) : (
+        onEnable && (
+          <TouchableOpacity onPress={onEnable}>
+            <Text style={styles.openSettings}>Enable</Text>
+          </TouchableOpacity>
+        )
       )}
     </View>
   );

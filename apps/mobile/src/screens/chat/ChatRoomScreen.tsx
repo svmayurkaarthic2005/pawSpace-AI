@@ -22,6 +22,7 @@ import { SerializedMessage } from '../../services/socket.service';
 import { timeAgo } from '../../utils';
 import { FONT_SIZE, SPACING, COLORS } from '../../constants';
 import { nanoid } from '../../utils/nanoid';
+import { toast } from '../../components/ui/Toast';
 
 type Props = NativeStackScreenProps<any, 'ChatRoom'>;
 
@@ -320,11 +321,7 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleVideoCall = useCallback(() => {
     if (!isOtherOnline) {
-      Toast.show({
-        type: 'info',
-        text1: 'User is offline',
-        text2: `${otherUser.name} is currently offline and cannot receive calls.`,
-      });
+      toast.info(`${otherUser.name} is currently offline and cannot receive calls.`);
       return;
     }
 

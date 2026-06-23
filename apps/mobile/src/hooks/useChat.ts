@@ -39,16 +39,21 @@ export const useChat = ({ chatId, currentUserId }: UseChatOptions) => {
     const handleMessage = (msg: SerializedMessage) => {
       if (msg.chatId !== chatId) return;
 
+      // If this is the sender's own confirmed message AND it has a tempId,
+      // skip it here — chat:message_sent already handles replacing the optimistic entry.
+      if (msg.sender._id === currentUserId && msg.tempId) return;
+
       addMessage(chatId, msg);
       updateChatLastMessage(chatId, msg);
 
-      // If this chat is not active, increment unread
-      if (activeChat !== chatId && msg.sender._id !== currentUserId) {
+      // If this chat is not active, increment unread (only for others' messages)
+      const activeChatId = useChatStore.getState().activeChat;
+      if (activeChatId !== chatId && msg.sender._id !== currentUserId) {
         incrementUnread(chatId);
       }
 
       // Auto-mark as read if chat is active and message is from someone else
-      if (activeChat === chatId && msg.sender._id !== currentUserId) {
+      if (activeChatId === chatId && msg.sender._id !== currentUserId) {
         socketService.markRead(chatId, msg._id);
         markRead(chatId);
       }
@@ -125,7 +130,7 @@ export const useChat = ({ chatId, currentUserId }: UseChatOptions) => {
       // Clear all typing timers
       Object.values(typingTimers.current).forEach(clearTimeout);
     };
-  }, [chatId, currentUserId, activeChat, addMessage, updateMessage, deleteMessage,
+  }, [chatId, currentUserId, addMessage, updateMessage, deleteMessage,
     setTyping, clearTyping, markRead, setUserOnline, setUserOffline,
     updateChatLastMessage, incrementUnread]);
 

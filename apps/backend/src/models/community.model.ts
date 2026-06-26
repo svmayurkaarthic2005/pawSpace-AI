@@ -121,7 +121,6 @@ const communitySchema = new Schema<ICommunity, ICommunityModel>(
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
-communitySchema.index({ slug: 1 }, { unique: true });
 communitySchema.index({ memberCount: -1 }); // trending communities
 communitySchema.index({ species: 1 });
 communitySchema.index({ lastActivityAt: -1 }); // most active communities

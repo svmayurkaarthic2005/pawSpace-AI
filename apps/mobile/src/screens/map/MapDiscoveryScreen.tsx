@@ -69,19 +69,7 @@ const MapDiscoveryScreen: React.FC = () => {
     });
   }, [location.granted, location.coords, location.denied, location.blocked]);
 
-  // Call getCurrentLocation explicitly on mount
-  useEffect(() => {
-    console.log('📍 MapDiscoveryScreen explicit location fetch on mount');
-    location.getCurrentLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  useEffect(() => {
-    // Only fetch location initially if we don't have it
-    if (!location.coords && !location.granted) {
-       location.getCurrentLocation();
-    }
-  }, []);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const filterSheetRef = useRef<BottomSheet>(null);
 

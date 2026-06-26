@@ -137,6 +137,12 @@ app.get('/health', async (_req: Request, res: Response) => {
   });
 });
 
+// ─── Ping (Cron keep-alive) ───────────────────────────────────────────────────
+
+app.get('/ping', (_req: Request, res: Response) => {
+  res.status(200).send('OK');
+});
+
 // ─── FCM Token Update ─────────────────────────────────────────────────────────
 
 import { authenticate } from './middleware/auth';

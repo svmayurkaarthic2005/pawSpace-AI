@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Alert, Modal, Image,
+  Alert, Modal, Image, PermissionsAndroid,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -13,12 +13,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { chatApi } from '../../services/chat.api';
 import { useChatStore, ChatParticipant } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { useChat } from '../../hooks/useChat';
-import { SerializedMessage } from '../../services/socket.service';
+import { socketService, SerializedMessage } from '../../services/socket.service';
 import { timeAgo } from '../../utils';
 import { FONT_SIZE, SPACING, COLORS } from '../../constants';
 import { nanoid } from '../../utils/nanoid';
@@ -194,14 +194,13 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [chatId, setActiveChat]);
 
   // Mark last message as read on mount and when new messages arrive
+  const lastMessage = chatMessages[chatMessages.length - 1];
+  const lastMessageId = lastMessage?._id;
+
   useEffect(() => {
-    if (chatMessages.length === 0) return;
-    
-    const last = chatMessages[chatMessages.length - 1];
-    if (last && last.sender._id !== currentUser?.id) {
-      markAsRead(last._id);
-    }
-  }, [chatMessages.length, currentUser?.id, markAsRead]);
+    if (!lastMessage || lastMessage.sender._id === currentUser?.id) return;
+    markAsRead(lastMessage._id);
+  }, [lastMessageId, currentUser?.id, markAsRead]);
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
@@ -245,8 +244,13 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   const handlePickImage = useCallback(async (fromCamera = false) => {
     setShowAttachSheet(false);
     try {
+      if (fromCamera && Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+      }
+
       const result = fromCamera
-        ? await launchImageLibrary({ mediaType: 'photo', quality: 0.8 }) // fallback — camera needs launchCamera
+        ? await launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: false })
         : await launchImageLibrary({ 
             mediaType: 'mixed', 
             quality: 0.8,
@@ -379,7 +383,10 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerActionBtn}>
+          <TouchableOpacity 
+            style={styles.headerActionBtn}
+            onPress={() => Alert.alert('AI Suggestions', 'Coming soon: AI-powered conversation starters based on your shared pet interests!')}
+          >
             <Icon name="sparkles-outline" size={20} color="#A78BFA" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerActionBtn} onPress={handleVideoCall}>
@@ -414,12 +421,12 @@ const ChatRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
           }}
           onEndReachedThreshold={0.3}
-          ListHeaderComponent={
+          ListHeaderComponent={isTyping ? <TypingIndicator /> : null}
+          ListFooterComponent={
             isFetchingNextPage ? (
               <ActivityIndicator color="#7C3AED" style={{ marginVertical: SPACING.sm }} />
             ) : null
           }
-          ListFooterComponent={isTyping ? <TypingIndicator /> : null}
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
         />

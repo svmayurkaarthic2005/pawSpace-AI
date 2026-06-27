@@ -1,0 +1,163 @@
+diff --git a/node_modules/react-native-screens/android/.gradle/8.9/checksums/checksums.lock b/node_modules/react-native-screens/android/.gradle/8.9/checksums/checksums.lock
+new file mode 100644
+index 0000000..88f2a76
+Binary files /dev/null and b/node_modules/react-native-screens/android/.gradle/8.9/checksums/checksums.lock differ
+diff --git a/node_modules/react-native-screens/android/.gradle/8.9/dependencies-accessors/gc.properties b/node_modules/react-native-screens/android/.gradle/8.9/dependencies-accessors/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-screens/android/.gradle/8.9/fileChanges/last-build.bin b/node_modules/react-native-screens/android/.gradle/8.9/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/react-native-screens/android/.gradle/8.9/fileChanges/last-build.bin differ
+diff --git a/node_modules/react-native-screens/android/.gradle/8.9/fileHashes/fileHashes.lock b/node_modules/react-native-screens/android/.gradle/8.9/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..34c3eec
+Binary files /dev/null and b/node_modules/react-native-screens/android/.gradle/8.9/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/react-native-screens/android/.gradle/8.9/gc.properties b/node_modules/react-native-screens/android/.gradle/8.9/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..ba5f85c
+Binary files /dev/null and b/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/cache.properties b/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..edcccf9
+--- /dev/null
++++ b/node_modules/react-native-screens/android/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Sat Jun 27 17:33:17 IST 2026
++gradle.version=8.9
+diff --git a/node_modules/react-native-screens/android/.gradle/vcs-1/gc.properties b/node_modules/react-native-screens/android/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-screens/android/.project b/node_modules/react-native-screens/android/.project
+new file mode 100644
+index 0000000..cab0d1b
+--- /dev/null
++++ b/node_modules/react-native-screens/android/.project
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<projectDescription>
++	<name>react-native-screens</name>
++	<comment>Project react-native-screens created by Buildship.</comment>
++	<projects>
++	</projects>
++	<buildSpec>
++		<buildCommand>
++			<name>org.eclipse.buildship.core.gradleprojectbuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
++	</buildSpec>
++	<natures>
++		<nature>org.eclipse.buildship.core.gradleprojectnature</nature>
++	</natures>
++	<filteredResources>
++		<filter>
++			<id>1782556922355</id>
++			<name></name>
++			<type>30</type>
++			<matcher>
++				<id>org.eclipse.core.resources.regexFilterMatcher</id>
++				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
++			</matcher>
++		</filter>
++	</filteredResources>
++</projectDescription>
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStack.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStack.kt
+index 46d86c8..9db00a2 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStack.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStack.kt
+@@ -312,7 +312,7 @@ class ScreenStack(context: Context?) : ScreenContainer(context) {
+     }
+ 
+     private fun obtainDrawingOp(): DrawingOp =
+-        if (drawingOpPool.isEmpty()) DrawingOp() else drawingOpPool.removeLast()
++        if (drawingOpPool.isEmpty()) DrawingOp() else drawingOpPool.removeAt(drawingOpPool.size - 1)
+ 
+     private inner class DrawingOp {
+         var canvas: Canvas? = null
+diff --git a/node_modules/react-native-screens/lib/commonjs/index.js b/node_modules/react-native-screens/lib/commonjs/index.js
+index 073887a..6817632 100644
+--- a/node_modules/react-native-screens/lib/commonjs/index.js
++++ b/node_modules/react-native-screens/lib/commonjs/index.js
+@@ -158,4 +158,7 @@ const ScreenStackHeaderSubview = _reactNative.View;
+ exports.ScreenStackHeaderSubview = ScreenStackHeaderSubview;
+ const shouldUseActivityState = true;
+ exports.shouldUseActivityState = shouldUseActivityState;
++exports.compatibilityFlags = {};
++exports.ScreenStackItem = Screen;
++exports.ScreenFooter = _reactNative.View;
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff --git a/node_modules/react-native-screens/lib/commonjs/index.native.js b/node_modules/react-native-screens/lib/commonjs/index.native.js
+index 4f77161..dc8db5d 100644
+--- a/node_modules/react-native-screens/lib/commonjs/index.native.js
++++ b/node_modules/react-native-screens/lib/commonjs/index.native.js
+@@ -413,6 +413,9 @@ module.exports = {
+   useTransitionProgress: _useTransitionProgress.default,
+   isSearchBarAvailableForCurrentPlatform: _utils.isSearchBarAvailableForCurrentPlatform,
+   isNewBackTitleImplementation: _utils.isNewBackTitleImplementation,
+-  executeNativeBackPress: _utils.executeNativeBackPress
++  executeNativeBackPress: _utils.executeNativeBackPress,
++  compatibilityFlags: {},
++  ScreenStackItem: Screen,
++  ScreenFooter: _reactNative.View
+ };
+ //# sourceMappingURL=index.native.js.map
+\ No newline at end of file
+diff --git a/node_modules/react-native-screens/lib/module/index.js b/node_modules/react-native-screens/lib/module/index.js
+index 2799d7c..f89755e 100644
+--- a/node_modules/react-native-screens/lib/module/index.js
++++ b/node_modules/react-native-screens/lib/module/index.js
+@@ -67,4 +67,7 @@ export const ScreenStackHeaderConfig = props => /*#__PURE__*/React.createElement
+ export const SearchBar = View;
+ export const ScreenStackHeaderSubview = View;
+ export const shouldUseActivityState = true;
++export const compatibilityFlags = {};
++export const ScreenStackItem = Screen;
++export const ScreenFooter = View;
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff --git a/node_modules/react-native-screens/lib/module/index.native.js b/node_modules/react-native-screens/lib/module/index.native.js
+index 67bbda8..5f2d666 100644
+--- a/node_modules/react-native-screens/lib/module/index.native.js
++++ b/node_modules/react-native-screens/lib/module/index.native.js
+@@ -410,6 +410,9 @@ module.exports = {
+   useTransitionProgress,
+   isSearchBarAvailableForCurrentPlatform,
+   isNewBackTitleImplementation,
+-  executeNativeBackPress
++  executeNativeBackPress,
++  compatibilityFlags: {},
++  ScreenStackItem: Screen,
++  ScreenFooter: View
+ };
+ //# sourceMappingURL=index.native.js.map
+\ No newline at end of file
+diff --git a/node_modules/react-native-screens/src/index.native.tsx b/node_modules/react-native-screens/src/index.native.tsx
+index 8e00ebb..fe2d2e7 100644
+--- a/node_modules/react-native-screens/src/index.native.tsx
++++ b/node_modules/react-native-screens/src/index.native.tsx
+@@ -616,4 +616,8 @@ module.exports = {
+   isSearchBarAvailableForCurrentPlatform,
+   isNewBackTitleImplementation,
+   executeNativeBackPress,
++
++  compatibilityFlags: {},
++  ScreenStackItem: Screen,
++  ScreenFooter: View,
+ };
+diff --git a/node_modules/react-native-screens/src/index.tsx b/node_modules/react-native-screens/src/index.tsx
+index 9e4e264..5aaafaa 100644
+--- a/node_modules/react-native-screens/src/index.tsx
++++ b/node_modules/react-native-screens/src/index.tsx
+@@ -117,3 +117,7 @@ export const ScreenStackHeaderSubview: React.ComponentType<
+ > = View;
+ 
+ export const shouldUseActivityState = true;
++
++export const compatibilityFlags = {};
++export const ScreenStackItem = Screen;
++export const ScreenFooter = View;

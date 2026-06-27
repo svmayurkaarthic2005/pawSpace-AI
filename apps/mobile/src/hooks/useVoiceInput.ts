@@ -1,5 +1,9 @@
-import { useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import Voice, {
+  SpeechResultsEvent,
+  SpeechErrorEvent,
+} from '@react-native-voice/voice';
 
 interface UseVoiceInputReturn {
   isListening: boolean;
@@ -10,54 +14,6 @@ interface UseVoiceInputReturn {
   cancelListening: () => Promise<void>;
   clearTranscript: () => void;
 }
-
-// Stub implementation until @react-native-voice/voice is installed
-// To enable voice input, install: npm install @react-native-voice/voice
-// And uncomment the full implementation below
-
-export const useVoiceInput = (): UseVoiceInputReturn => {
-  const [isListening] = useState(false);
-  const [transcript] = useState('');
-  const [error] = useState<string | null>(null);
-
-  const startListening = useCallback(async () => {
-    Alert.alert(
-      'Voice Input Not Available',
-      'Voice input feature requires additional setup. Please use text search.',
-    );
-  }, []);
-
-  const stopListening = useCallback(async () => {
-    // No-op
-  }, []);
-
-  const cancelListening = useCallback(async () => {
-    // No-op
-  }, []);
-
-  const clearTranscript = useCallback(() => {
-    // No-op
-  }, []);
-
-  return {
-    isListening,
-    transcript,
-    error,
-    startListening,
-    stopListening,
-    cancelListening,
-    clearTranscript,
-  };
-};
-
-/* Full implementation - uncomment when @react-native-voice/voice is installed
-
-import { useState, useEffect, useCallback } from 'react';
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
-import Voice, {
-  SpeechResultsEvent,
-  SpeechErrorEvent,
-} from '@react-native-voice/voice';
 
 export const useVoiceInput = (): UseVoiceInputReturn => {
   const [isListening, setIsListening] = useState(false);
@@ -173,4 +129,3 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     clearTranscript,
   };
 };
-*/

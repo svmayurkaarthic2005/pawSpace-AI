@@ -58,6 +58,37 @@ const bootStyles = StyleSheet.create({
   name: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
 });
 
+// ─── Error Boundary Wrapper for Navigator ────────────────────────────────────
+
+class NavigatorErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[NavigatorErrorBoundary] Fatal render/mount error caught:', error.message, error.stack, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={[bootStyles.root, { padding: 20 }]}>
+          <Text style={[bootStyles.name, { color: '#EF4444', marginBottom: 10 }]}>App Navigation Error</Text>
+          <Text style={{ color: '#FFFFFF', textAlign: 'center', marginBottom: 20 }}>
+            {this.state.error?.message || 'Unknown error occurred during navigation setup'}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── Root Navigator ──────────────────────────────────────────────────────────
 
 const RootNavigator: React.FC = () => {
@@ -65,15 +96,9 @@ const RootNavigator: React.FC = () => {
   const user = useUser(); // Use the selector hook to ensure re-renders
   const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
 
-  // Debug: log auth/navigation state to help track crash during navigator mount
-  // This log is intentionally lightweight to avoid leaking sensitive data.
-  console.log('[Navigator] render attempt:', {
-    isAuthenticated: !!isAuthenticated,
-    isLoading: !!isLoading,
-    hasUser: !!user,
-    userId: user?.id ?? null,
-  });
-  
+  // Task 5: Add this as the very first line inside the Navigator component
+  console.log('[Navigator] rendering screen for auth state:', { isAuthenticated: !!isAuthenticated, isLoading: !!isLoading, hasUser: !!user });
+
   /**
    * null  = still checking
    * true  = onboarding done
@@ -130,62 +155,67 @@ const RootNavigator: React.FC = () => {
     };
   }, [isAuthenticated, user, setUnreadCount]);
 
-  // Both async checks must resolve before rendering navigator
-  if (isLoading || onboardingDone === null) {
+  try {
+    // Both async checks must resolve before rendering navigator
+    if (isLoading || onboardingDone === null) {
+      console.log('[Navigator] Decision: Rendering BootScreen');
+      return <BootScreen />;
+    }
+
+    // Check if user is authenticated but profile is incomplete
+    const needsProfileCompletion = isAuthenticated && user && user.isProfileComplete === false;
+
+    const targetStack = needsProfileCompletion 
+      ? 'AuthStack (CompleteProfile)' 
+      : isAuthenticated 
+        ? 'MainStack' 
+        : `AuthStack (skipOnboarding: ${onboardingDone || false})`;
+    console.log('[Navigator] Decision: Rendering target ->', targetStack);
+
+    return (
+      <NavigatorErrorBoundary>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+            {needsProfileCompletion ? (
+              // User is authenticated but needs to complete profile
+              <Stack.Screen 
+                name="Auth" 
+                component={AuthStack} 
+                initialParams={{ skipOnboarding: true } as any}
+              />
+            ) : isAuthenticated ? (
+              // Already logged in with complete profile → go to main app
+              <Stack.Screen name="Main" component={MainStack} />
+            ) : (
+              <Stack.Screen
+                name="Auth"
+                component={AuthStack}
+                initialParams={{ skipOnboarding: onboardingDone || false } as any}
+              />
+            )}
+
+            {/* Global Modal Screens */}
+            <Stack.Screen 
+              name="IncomingCall" 
+              component={IncomingCallScreen} 
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen 
+              name="VideoCall" 
+              component={VideoCallScreen} 
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+            />
+          </Stack.Navigator>
+
+          {/* Global Toast overlay */}
+          <Toast />
+        </NavigationContainer>
+      </NavigatorErrorBoundary>
+    );
+  } catch (renderError: any) {
+    console.error('[Navigator] Synchronous render error:', renderError?.message, renderError?.stack);
     return <BootScreen />;
   }
-
-  // Check if user is authenticated but profile is incomplete
-  const needsProfileCompletion = isAuthenticated && user && user.isProfileComplete === false;
-
-  return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
-        {needsProfileCompletion ? (
-          // User is authenticated but needs to complete profile
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthStack} 
-            initialParams={{ skipOnboarding: true } as any}
-          />
-        ) : isAuthenticated ? (
-          // Already logged in with complete profile → go to main app
-          <Stack.Screen name="Main" component={MainStack} />
-        ) : (
-          /**
-           * AuthStack contains:
-           *   - Splash (initial screen when onboarding not done)
-           *   - OnboardingWelcome / Profile / Discover
-           *   - Login / Register
-           *
-           * When onboarding IS done we still use AuthStack but tell it to
-           * start at Login by passing initialRouteName via screenOptions.
-           * We achieve this with a wrapper component.
-           */
-          <Stack.Screen
-            name="Auth"
-            component={AuthStack}
-            initialParams={{ skipOnboarding: onboardingDone || false } as any}
-          />
-        )}
-
-        {/* Global Modal Screens */}
-        <Stack.Screen 
-          name="IncomingCall" 
-          component={IncomingCallScreen} 
-          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-        />
-        <Stack.Screen 
-          name="VideoCall" 
-          component={VideoCallScreen} 
-          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-        />
-      </Stack.Navigator>
-
-      {/* Global Toast overlay */}
-      <Toast />
-    </NavigationContainer>
-  );
 };
 
 export default RootNavigator;

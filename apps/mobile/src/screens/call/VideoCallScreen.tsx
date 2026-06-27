@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import FeatherIcon from 'react-native-vector-icons/Feather';
 import {
   createAgoraRtcEngine,
   IRtcEngine,
@@ -53,6 +52,7 @@ const VideoCallScreen: React.FC = () => {
   const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [callEnded, setCallEnded] = useState(false);
   const [isWaitingForAnswer, setIsWaitingForAnswer] = useState(isCaller);
+  const isWaitingForAnswerRef = useRef(isCaller);
 
   const engineRef = useRef<IRtcEngine | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -78,6 +78,33 @@ const VideoCallScreen: React.FC = () => {
     }
     return true; // iOS handled via Info.plist
   };
+
+  // ─── Cleanup & call end (declared early so joinChannel can reference them) ───
+
+  const leaveAndCleanup = useCallback(() => {
+    if (hasLeftRef.current) return;
+    hasLeftRef.current = true;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (engineRef.current) {
+      engineRef.current.leaveChannel();
+      engineRef.current.release();
+      engineRef.current = null;
+    }
+  }, []);
+
+  const handleCallEnd = useCallback((emitEnd: boolean) => {
+    if (emitEnd) {
+      socketService.endCall(channelName, remoteUserId);
+    }
+    setCallEnded(true);
+    leaveAndCleanup();
+
+    setTimeout(() => {
+      navigation.goBack();
+    }, 1500);
+  }, [channelName, remoteUserId, navigation, leaveAndCleanup]);
 
   // ─── Agora init & join ──────────────────────────────────────────────────────
 
@@ -164,6 +191,7 @@ const VideoCallScreen: React.FC = () => {
     const handleCallAccepted = (payload: { channelName: string; byUserId: string }) => {
       if (payload.channelName === channelName) {
         setIsWaitingForAnswer(false);
+        isWaitingForAnswerRef.current = false;
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
       }
     };
@@ -182,7 +210,7 @@ const VideoCallScreen: React.FC = () => {
     // If caller, start 30s timeout
     if (isCaller) {
       timeoutRef.current = setTimeout(() => {
-        if (isWaitingForAnswer) {
+        if (isWaitingForAnswerRef.current) {
           Alert.alert('No Answer', `${remoteUserName} did not answer.`);
           handleCallEnd(true);
         }
@@ -195,7 +223,7 @@ const VideoCallScreen: React.FC = () => {
       socketService.off('call:rejected', handleCallRejected);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [channelName, isCaller, isWaitingForAnswer, remoteUserName]);
+  }, [channelName, isCaller, remoteUserName, handleCallEnd]);
 
   useEffect(() => {
     joinChannel();
@@ -204,32 +232,6 @@ const VideoCallScreen: React.FC = () => {
     };
   }, []);
 
-  // ─── Cleanup ────────────────────────────────────────────────────────────────
-
-  const leaveAndCleanup = useCallback(() => {
-    if (hasLeftRef.current) return;
-    hasLeftRef.current = true;
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (engineRef.current) {
-      engineRef.current.leaveChannel();
-      engineRef.current.release();
-      engineRef.current = null;
-    }
-  }, []);
-
-  const handleCallEnd = useCallback((emitEnd: boolean) => {
-    if (emitEnd) {
-      socketService.endCall(channelName, remoteUserId);
-    }
-    setCallEnded(true);
-    leaveAndCleanup();
-
-    setTimeout(() => {
-      navigation.goBack();
-    }, 1500);
-  }, [channelName, remoteUserId, navigation, leaveAndCleanup]);
 
   // ─── Controls ────────────────────────────────────────────────────────────────
 
@@ -429,3 +431,4 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
 });
+

@@ -43,7 +43,7 @@ import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
 import { NewChatScreen } from '../screens/chat/NewChatScreen';
 import AIPetAssistantScreen from '../screens/ai/AIPetAssistantScreen';
 import SmartSearchScreen from '../screens/ai/SmartSearchScreen';
-import { CommunitiesScreen } from '../screens/community/CommunitiesScreen';
+import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
 import { CommunityDetailScreen } from '../screens/community/CommunityDetailScreen';
 import { CommunityMembersScreen } from '../screens/community/CommunityMembersScreen';
 import { CreateCommunityScreen } from '../screens/community/CreateCommunityScreen';
@@ -94,7 +94,7 @@ const ExploreNavigator = () => (
   <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
     <ExploreStack.Screen name="ExploreHome" component={ExploreScreen} />
     <ExploreStack.Screen name="MapDiscovery" component={MapDiscoveryScreen} />
-    <ExploreStack.Screen name="Communities" component={CommunitiesScreen} />
+    <ExploreStack.Screen name="Communities" component={CommunitiesScreen as any} />
     <ExploreStack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
     <ExploreStack.Screen name="CommunityMembers" component={CommunityMembersScreen} />
     <ExploreStack.Screen name="Profile" component={ProfileScreen} />

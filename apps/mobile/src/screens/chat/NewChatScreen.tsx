@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
@@ -14,21 +15,26 @@ import { useQuery } from '@tanstack/react-query';
 import FastImage from 'react-native-fast-image';
 import Icon from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const NewChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const debouncedSearch = useDebounce(searchQuery, 350);
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ['users', 'search', searchQuery],
+  const { data: users, isLoading, error } = useQuery({
+    queryKey: ['users', 'search', debouncedSearch],
     queryFn: () =>
-      searchQuery.trim()
-        ? api.get(`/users/search?q=${searchQuery}`).then((r: any) => r.data.data)
+      debouncedSearch.trim()
+        ? api.get(`/users/search?q=${encodeURIComponent(debouncedSearch)}`).then((r: any) => r.data.data)
         : Promise.resolve([]),
-    enabled: searchQuery.trim().length > 0,
+    enabled: debouncedSearch.trim().length > 0,
   });
 
   const handleUserSelect = async (user: any) => {
+    if (isCreatingChat) return;
+    setIsCreatingChat(true);
     try {
       // Create or get chat with this user
       const response = await api.post('/chats', { userId: user._id });
@@ -45,12 +51,25 @@ export const NewChatScreen: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to create chat:', error);
+      Alert.alert('Error', 'Could not start a conversation. Please try again.');
+    } finally {
+      setIsCreatingChat(false);
     }
   };
 
   const renderUser = ({ item }: any) => (
-    <TouchableOpacity style={styles.userRow} onPress={() => handleUserSelect(item)}>
-      <FastImage source={{ uri: item.avatar }} style={styles.avatar} />
+    <TouchableOpacity 
+      style={styles.userRow} 
+      onPress={() => handleUserSelect(item)}
+      disabled={isCreatingChat}
+    >
+      <FastImage
+        source={{
+          uri: item.avatar ?? `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || item.username)}&background=7C3AED&color=fff&size=96`,
+          priority: FastImage.priority.normal,
+        }}
+        style={styles.avatar}
+      />
       <View style={styles.userInfo}>
         <Text style={styles.name}>{item.name || item.username}</Text>
         <Text style={styles.username}>@{item.username}</Text>
@@ -94,7 +113,13 @@ export const NewChatScreen: React.FC = () => {
         </View>
       )}
 
-      {!isLoading && searchQuery.trim() && users?.length === 0 && (
+      {!isLoading && error && searchQuery.trim() && (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Search failed. Please try again.</Text>
+        </View>
+      )}
+
+      {!isLoading && !error && searchQuery.trim() && users?.length === 0 && (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No users found</Text>
         </View>

@@ -5,16 +5,12 @@ import Icon from 'react-native-vector-icons/Feather';
 interface ChatListHeaderProps {
   searchQuery: string;
   onSearchChange: (text: string) => void;
-  onSearchFocus: () => void;
-  onSearchBlur: () => void;
   onCompose: () => void;
 }
 
 export const ChatListHeader: React.FC<ChatListHeaderProps> = ({
   searchQuery,
   onSearchChange,
-  onSearchFocus,
-  onSearchBlur,
   onCompose,
 }) => {
   return (
@@ -31,8 +27,6 @@ export const ChatListHeader: React.FC<ChatListHeaderProps> = ({
         <TextInput
           value={searchQuery}
           onChangeText={onSearchChange}
-          onFocus={onSearchFocus}
-          onBlur={onSearchBlur}
           placeholder="Search messages"
           placeholderTextColor="rgba(255,255,255,0.3)"
           style={styles.searchInput}

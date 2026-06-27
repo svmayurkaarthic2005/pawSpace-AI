@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import api from '../../services/api';
 import GlassCard from '../../components/ui/GlassCard';
 import AuthInput from '../../components/ui/AuthInput';
 import { FONT_SIZE, SPACING } from '../../constants';
+import { useDebounce } from '../../hooks/useDebounce';
+import Toast from 'react-native-toast-message';
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -69,36 +71,42 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   const username = watch('username');
 
-  // Check username availability as user types
-  React.useEffect(() => {
-    const checkUsername = async () => {
-      if (!username || username.length < 3) {
-        setUsernameAvailable(null);
-        return;
-      }
+  const debouncedUsername = useDebounce(username, 500);
 
-      // Don't check if it's the same as current username
-      if (username === user?.username) {
-        setUsernameAvailable(true);
-        return;
-      }
+  // Check username availability (debounced via useDebounce hook)
+  useEffect(() => {
+    if (!debouncedUsername || debouncedUsername.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+    // Don't check if unchanged from saved username
+    if (debouncedUsername === user?.username) {
+      setUsernameAvailable(true);
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(debouncedUsername)) {
+      setUsernameAvailable(null);
+      return;
+    }
 
-      setIsCheckingUsername(true);
-      try {
-        const { data } = await api.get<{ success: boolean; data: { available: boolean } }>(
-          `/auth/check-username/${username}`,
-        );
-        setUsernameAvailable(data.data.available);
-      } catch {
-        setUsernameAvailable(null);
-      } finally {
-        setIsCheckingUsername(false);
-      }
-    };
+    let cancelled = false;
+    setIsCheckingUsername(true);
+    api
+      .get<{ success: boolean; data: { available: boolean } }>(
+        `/auth/check-username/${debouncedUsername}`,
+      )
+      .then(({ data }) => {
+        if (!cancelled) setUsernameAvailable(data.data.available);
+      })
+      .catch(() => {
+        if (!cancelled) setUsernameAvailable(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCheckingUsername(false);
+      });
 
-    const timeoutId = setTimeout(checkUsername, 500);
-    return () => clearTimeout(timeoutId);
-  }, [username, user?.username]);
+    return () => { cancelled = true; };
+  }, [debouncedUsername, user?.username]);
 
   const onSubmit = async (data: ProfileFormData) => {
     try {
@@ -107,27 +115,40 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Update profile
-      const response = await api.put('/users/profile', {
-        username: data.username,
-        bio: data.bio || '',
-        isProfileComplete: true,
-      });
-
-      // Update user in store
-      if (user) {
-        setUser({
-          ...user,
+      // Update profile and use backend response to update the store
+      const { data: responseData } = await api.put<{ data: { user: any } }>(
+        '/users/profile',
+        {
           username: data.username,
-          bio: data.bio || undefined,
+          bio: data.bio || '',
           isProfileComplete: true,
-        });
+        },
+      );
+
+      if (user) {
+        if (responseData?.data?.user) {
+          // Prefer authoritative backend user object
+          setUser({ ...user, ...responseData.data.user });
+        } else {
+          // Fallback: client-side merge
+          setUser({
+            ...user,
+            username: data.username,
+            bio: data.bio || undefined,
+            isProfileComplete: true,
+          });
+        }
       }
 
-      Alert.alert('Success', 'Your profile is now complete!');
-      
-      // Navigation will be handled automatically by the root navigator
-      // when isProfileComplete becomes true
+      // Toast instead of Alert — navigator redirect handles confirmation
+      Toast.show({
+        type: 'success',
+        text1: 'Profile complete!',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
+
+      // Navigation handled automatically by root navigator when isProfileComplete → true
     } catch (err: unknown) {
       const message = (err as Error).message || 'Failed to update profile';
       Alert.alert('Error', message);
@@ -219,7 +240,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
               name="bio"
               render={({ field: { onChange, onBlur, value } }) => (
                 <View style={styles.inputWrapper}>
-                  <View style={styles.inputIconLeft}>
+                  <View style={[styles.inputIconLeft, { top: 36 }]}>
                     <Icon name="create-outline" size={20} color="rgba(255,255,255,0.6)" />
                   </View>
                   <View>
@@ -243,7 +264,7 @@ const CompleteProfileScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Complete Profile Button */}
             <TouchableOpacity
-              style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, (isSubmitting || isCheckingUsername || usernameAvailable === false) && styles.primaryBtnDisabled]}
               onPress={handleSubmit(onSubmit)}
               disabled={isSubmitting || isCheckingUsername || (usernameAvailable === false)}
               activeOpacity={0.85}

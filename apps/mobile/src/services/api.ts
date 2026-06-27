@@ -18,9 +18,9 @@ export const setTokenRefreshCallback = (callback: () => Promise<void>) => {
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
 
-const api: AxiosInstance = axios.create({
+export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -217,5 +217,4 @@ api.interceptors.response.use(
   },
 );
 
-export { api };
 export default api;

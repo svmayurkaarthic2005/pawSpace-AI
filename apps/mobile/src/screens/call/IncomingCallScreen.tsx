@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -41,10 +41,37 @@ const IncomingCallScreen: React.FC = () => {
   const { channelName, fromUserId, callerName, callerAvatar } = route.params;
 
   const [secondsLeft, setSecondsLeft] = useState(30);
+  const secondsLeftRef = useRef(30);
+  const isMounted = useRef(true);
 
   // Pulsing animation for the avatar ring
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const handleAccept = useCallback(() => {
+    Vibration.cancel();
+    socketService.acceptCall(channelName, fromUserId);
+    navigation.replace('VideoCall', {
+      channelName,
+      remoteUserId: fromUserId,
+      remoteUserName: callerName,
+      remoteUserAvatar: callerAvatar,
+      isCaller: false,
+    });
+  }, [channelName, fromUserId, callerName, callerAvatar, navigation]);
+
+  const handleDecline = useCallback(() => {
+    if (!isMounted.current) return;
+    Vibration.cancel();
+    socketService.rejectCall(channelName, fromUserId, 'declined');
+    navigation.goBack();
+  }, [channelName, fromUserId, navigation]);
 
   useEffect(() => {
     // Vibrate pattern
@@ -60,14 +87,18 @@ const IncomingCallScreen: React.FC = () => {
 
     // Auto-decline after 30 seconds
     const countdown = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(countdown);
+      if (secondsLeftRef.current <= 1) {
+        clearInterval(countdown);
+        if (isMounted.current) {
+          setSecondsLeft(0);
           handleDecline();
-          return 0;
         }
-        return prev - 1;
-      });
+      } else {
+        secondsLeftRef.current -= 1;
+        if (isMounted.current) {
+          setSecondsLeft(secondsLeftRef.current);
+        }
+      }
     }, 1000);
 
     return () => {
@@ -75,25 +106,7 @@ const IncomingCallScreen: React.FC = () => {
       clearInterval(countdown);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
-
-  const handleAccept = () => {
-    Vibration.cancel();
-    socketService.acceptCall(channelName, fromUserId);
-    navigation.replace('VideoCall', {
-      channelName,
-      remoteUserId: fromUserId,
-      remoteUserName: callerName,
-      remoteUserAvatar: callerAvatar,
-      isCaller: false,
-    });
-  };
-
-  const handleDecline = () => {
-    Vibration.cancel();
-    socketService.rejectCall(channelName, fromUserId, 'declined');
-    navigation.goBack();
-  };
+  }, [handleDecline, pulseAnim]);
 
   const avatarUri =
     callerAvatar ??

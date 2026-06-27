@@ -64,7 +64,7 @@ const AddPetScreen: React.FC = () => {
       });
 
       // Invalidate pets query to refresh the list
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PETS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MY_PETS });
 
       Alert.alert('Success', 'Pet added successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }

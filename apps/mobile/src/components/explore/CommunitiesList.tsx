@@ -49,7 +49,7 @@ export const CommunitiesList: React.FC<CommunitiesListProps> = ({ communities })
             {/* Species Tags */}
             {(community.species ?? []).length > 0 && (
               <View style={styles.tagsContainer}>
-                {(community.species ?? []).slice(0, 3).map((species) => (
+                {(community.species ?? []).slice(0, 3).map((species: string) => (
                   <View key={species} style={styles.tag}>
                     <Text style={styles.tagText}>{species}</Text>
                   </View>

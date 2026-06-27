@@ -40,9 +40,10 @@ interface NotificationsResponse {
 
 const groupIntoSections = (notifications: Notification[]): NotificationSection[] => {
   const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const nowTime = now.getTime(); // capture before any mutation
+  const oneHourAgo = new Date(nowTime - 60 * 60 * 1000);
   const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-  const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const startOfWeek = new Date(nowTime - 7 * 24 * 60 * 60 * 1000); // use nowTime, not now.getTime()
 
   const newItems = notifications.filter(
     (n) => !n.isRead && new Date(n.createdAt) >= oneHourAgo,
@@ -297,7 +298,9 @@ export const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         }
         break;
       case 'ai_suggestion':
-        navigation.navigate('Explore', { initialQuery: notification.entityName + ' events' });
+        navigation.navigate('SmartSearch', { 
+          initialQuery: notification.entityName ? notification.entityName + ' events' : 'pet events near me'
+        });
         break;
       case 'community_post':
         if (notification.entityId) {
@@ -315,6 +318,7 @@ export const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   useEffect(() => {
     const handleNewNotification = (notif: SerializedNotification) => {
+      const activityTypes = ['like', 'comment', 'follow'];
       // Convert SerializedNotification to Notification format
       const notification: Notification = {
         _id: notif._id,
@@ -325,7 +329,7 @@ export const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         entityType: notif.entityType,
         message: notif.message,
         isRead: notif.isRead,
-        tab: 'all', // Default tab
+        tab: activityTypes.includes(notif.type) ? 'activity' : 'all',
         createdAt: notif.createdAt,
       };
 
@@ -357,7 +361,6 @@ export const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       });
 
       // Also add to activity tab if it's an activity notification
-      const activityTypes = ['like', 'comment', 'follow'];
       if (activityTypes.includes(notif.type)) {
         queryClient.setQueryData(['notifications', 'activity'], (old: any) => {
           if (!old || !old.pages || old.pages.length === 0) {

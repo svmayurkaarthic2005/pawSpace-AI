@@ -150,7 +150,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
         zoomingRef.current = false;
         onZoomIn();
       }, 300);
-    }).catch((err) => {
+    }).catch((err: Error) => {
       zoomingRef.current = false;
       console.warn('Zoom in error:', err);
     });
@@ -182,7 +182,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
         zoomingRef.current = false;
         onZoomOut();
       }, 300);
-    }).catch((err) => {
+    }).catch((err: Error) => {
       zoomingRef.current = false;
       console.warn('Zoom out error:', err);
     });
@@ -206,7 +206,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
         onPanDrag={() => {
           if (isFollowingUser) onUserInteraction();
         }}
-        onRegionChangeComplete={(region, details) => {
+        onRegionChangeComplete={(region: any, details: { isGesture?: boolean }) => {
           if (details?.isGesture && isFollowingUser) {
             onUserInteraction();
           }

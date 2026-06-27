@@ -19,12 +19,12 @@ import * as yup from 'yup';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import { AuthStackParamList } from '../../types';
-import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/auth.service';
 import { useDebounce } from '../../hooks/useDebounce';
 import GlassCard from '../../components/ui/GlassCard';
 import AuthInput from '../../components/ui/AuthInput';
 import { COLORS, FONT_SIZE, SPACING } from '../../constants';
+import StepIndicator from '../../components/ui/StepIndicator';
 
 // ─── Auth palette (mirrors LoginScreen) ──────────────────────────────────────
 const AUTH_PRIMARY = '#7C3AED';
@@ -74,71 +74,6 @@ function getPasswordStrength(pw: string): { score: number; label: string } {
 
 const STRENGTH_COLORS = ['transparent', '#EF4444', '#F59E0B', '#10B981', '#7C3AED'];
 
-// ─── Step Indicator ───────────────────────────────────────────────────────────
-
-const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, total }) => (
-  <View style={stepStyles.row}>
-    {Array.from({ length: total }).map((_, i) => {
-      const step = i + 1;
-      const active = step === current;
-      const done = step < current;
-      return (
-        <React.Fragment key={step}>
-          <View style={[stepStyles.circle, (active || done) && stepStyles.circleActive]}>
-            <Text style={[stepStyles.circleText, (active || done) && stepStyles.circleTextActive]}>
-              {step}
-            </Text>
-          </View>
-          {step < total && (
-            <View style={[stepStyles.line, done && stepStyles.lineActive]} />
-          )}
-        </React.Fragment>
-      );
-    })}
-  </View>
-);
-
-const stepStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  circle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circleActive: {
-    backgroundColor: AUTH_PRIMARY,
-    borderColor: AUTH_PRIMARY,
-  },
-  circleText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-  },
-  circleTextActive: {
-    color: '#FFFFFF',
-  },
-  line: {
-    flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: 4,
-    maxWidth: 48,
-  },
-  lineActive: {
-    backgroundColor: AUTH_PRIMARY,
-  },
-});
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -149,7 +84,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
-  const loginAction = useAuthStore((s) => s.login);
+  // loginAction intentionally omitted — auth store is updated by AddPetScreen after the register API call
 
   const {
     control,
@@ -231,7 +166,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       username: data.username,
       email: data.email,
       password: data.password,
-    } as never);
+    });
   };
 
   return (
@@ -459,12 +394,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Next Button */}
             <TouchableOpacity
-              style={[styles.primaryBtn, isSubmitting && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, (isSubmitting || usernameStatus === 'checking') && styles.primaryBtnDisabled]}
               onPress={handleSubmit(onSubmit)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || usernameStatus === 'checking'}
               activeOpacity={0.85}
             >
-              {isSubmitting ? (
+              {isSubmitting || usernameStatus === 'checking' ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>

@@ -19,7 +19,6 @@ export interface IUser extends Document {
   coverImage?: string;
   bio?: string;
   googleId?: string; // Google OAuth ID
-  supabaseId?: string; // Supabase Auth ID
   location?: {
     type: 'Point';
     coordinates: [number, number]; // [lng, lat]
@@ -138,13 +137,6 @@ const userSchema = new Schema<IUser, IUserModel>(
       type: String,
       default: null,
       sparse: true,
-    },
-    supabaseId: {
-      type: String,
-      default: null,
-      sparse: true,
-      unique: true,
-      // Deprecated: Kept for backward compatibility only
     },
     location: {
       type: {

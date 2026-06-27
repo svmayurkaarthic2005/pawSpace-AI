@@ -2,15 +2,17 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, useColorScheme, Share, Alert,
-  Dimensions,
+  Dimensions, Modal, FlatList,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { eventApi } from '../../services/event.service';
 import { useAuthStore } from '../../store/authStore';
 import useLocation from '../../hooks/useLocation';
 import { FONT_SIZE, SPACING } from '../../constants';
+import { MapView, PROVIDER_GOOGLE, MapErrorFallback, mapModuleError } from '../../components/map/MapWrapper';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COVER_HEIGHT = 280;
@@ -31,6 +33,7 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { coords } = useLocation();
   const queryClient = useQueryClient();
   const [descExpanded, setDescExpanded] = useState(false);
+  const [attendeesModalVisible, setAttendeesModalVisible] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['event', eventId],
@@ -107,7 +110,7 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Cover Image */}
         <View style={styles.coverContainer}>
           {event.coverImage ? (
@@ -154,7 +157,10 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={[styles.hostLabel, { color: subColor }]}>Hosted by</Text>
               <Text style={[styles.hostName, { color: '#7C3AED' }]}>@{event.creator.username}</Text>
             </View>
-            <TouchableOpacity style={styles.followBtn}>
+            <TouchableOpacity
+              style={styles.followBtn}
+              onPress={() => navigation.navigate('Profile', { userId: event.creator._id })}
+            >
               <Text style={styles.followBtnText}>Follow</Text>
             </TouchableOpacity>
           </View>
@@ -198,17 +204,32 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             ))}
           </ScrollView>
 
-          {/* Map preview - Placeholder */}
+          {/* Map preview */}
           <View style={[styles.mapPreview, { backgroundColor: isDark ? '#1A1A2E' : '#E5E7EB' }]}>
-            <View style={styles.mapPlaceholder}>
-              <Text style={styles.mapPinIcon}>📍</Text>
-              <Text style={[styles.mapPlaceholderText, { color: subColor }]}>
-                Map preview unavailable
-              </Text>
-              <Text style={[styles.mapPlaceholderSmall, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>
-                Tap "Get directions" below
-              </Text>
-            </View>
+            {mapModuleError || !MapView ? (
+              <MapErrorFallback error={mapModuleError || new Error('MapView not available')} />
+            ) : (
+              <View style={StyleSheet.absoluteFill}>
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  style={StyleSheet.absoluteFill}
+                  initialRegion={{
+                    latitude: lat,
+                    longitude: lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  pitchEnabled={false}
+                  rotateEnabled={false}
+                />
+                {/* Center Pin Overlay */}
+                <View style={styles.centerPinContainer} pointerEvents="none">
+                  <Icon name="location" size={32} color="#EF4444" style={styles.centerPin} />
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Address + Directions */}
@@ -239,7 +260,7 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Text style={[styles.sectionTitle, { color: textColor }]}>
                   Who's going ({totalAttendees})
                 </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => setAttendeesModalVisible(true)}>
                   <Text style={styles.seeAll}>See all</Text>
                 </TouchableOpacity>
               </View>
@@ -265,7 +286,10 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
 
           {/* AI Recommendation badge */}
-          <TouchableOpacity style={styles.aiBadge}>
+          <TouchableOpacity
+            style={styles.aiBadge}
+            onPress={() => navigation.navigate('SmartSearch', { initialQuery: `events like ${event.title}` })}
+          >
             <Text style={styles.aiBadgeIcon}>✦</Text>
             <View>
               <Text style={styles.aiBadgeTitle}>✦ Recommended for you</Text>
@@ -301,6 +325,46 @@ const EventDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           ))}
         </View>
       </View>
+
+      {/* Attendees Modal */}
+      <Modal visible={attendeesModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: cardBg }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: textColor }]}>Attendees ({totalAttendees})</Text>
+              <TouchableOpacity onPress={() => setAttendeesModalVisible(false)} style={{ padding: 4 }}>
+                <Icon name="close" size={24} color={textColor} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={attendees}
+              keyExtractor={(item) => (item.user as unknown as { _id: string })._id}
+              contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: SPACING.lg }}
+              renderItem={({ item }) => (
+                <View style={styles.attendeeModalItem}>
+                  <FastImage
+                    source={{
+                      uri: (item.user as unknown as { avatar?: string }).avatar ??
+                        `https://ui-avatars.com/api/?name=${(item.user as unknown as { name: string }).name}&background=7C3AED&color=fff`,
+                      priority: FastImage.priority.normal,
+                    }}
+                    style={styles.attendeeModalAvatar}
+                  />
+                  <View style={styles.attendeeModalInfo}>
+                    <Text style={[styles.attendeeModalName, { color: textColor }]}>{(item.user as unknown as { name: string }).name}</Text>
+                    <Text style={[styles.attendeeModalUsername, { color: subColor }]}>@{(item.user as unknown as { username: string }).username}</Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: item.status === 'going' ? 'rgba(16,185,129,0.15)' : 'rgba(217,119,6,0.15)' }]}>
+                    <Text style={[styles.statusBadgeText, { color: item.status === 'going' ? '#10B981' : '#D97706' }]}>
+                      {item.status === 'going' ? 'Going' : 'Maybe'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -426,6 +490,69 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm, alignItems: 'center',
   },
   rsvpBtnText: { fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  centerPinContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerPin: {
+    transform: [{ translateY: -16 }],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    height: '60%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+  },
+  attendeeModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  attendeeModalAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: SPACING.sm,
+  },
+  attendeeModalInfo: {
+    flex: 1,
+  },
+  attendeeModalName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+  },
+  attendeeModalUsername: {
+    fontSize: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
 });
 
 export default EventDetailScreen;

@@ -8,6 +8,12 @@ export interface RegisterPayload {
   username: string;
   email: string;
   password: string;
+  pet?: {
+    name: string;
+    species: string;
+    breed?: string;
+    age?: number;
+  };
 }
 
 export interface LoginPayload {
@@ -95,8 +101,11 @@ export const authApi = {
   /**
    * Register a new account and persist tokens to Keychain.
    */
-  async register(payload: RegisterPayload): Promise<AuthResponse> {
-    const { data } = await api.post<ApiBackendAuthResponse>('/auth/register', payload);
+  async register(payload: RegisterPayload | FormData): Promise<AuthResponse> {
+    const isFormData = payload instanceof FormData;
+    const { data } = await api.post<ApiBackendAuthResponse>('/auth/register', payload, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     const user = transformUser(data.data.user);
     await saveTokens(data.data.accessToken, data.data.refreshToken);
     return {

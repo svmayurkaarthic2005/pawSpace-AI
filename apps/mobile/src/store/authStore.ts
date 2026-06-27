@@ -16,6 +16,7 @@ interface AuthState {
   clerkToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isRetryingColdStart: boolean;
 
   // Actions
   login: (user: User, accessToken: string, refreshToken: string, clerkToken?: string) => Promise<void>;
@@ -36,6 +37,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clerkToken: null,
   isAuthenticated: false,
   isLoading: true,
+  isRetryingColdStart: false,
 
   /**
    * Called after a successful login or register.
@@ -209,7 +211,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
    */
   handleFirebaseUser: async (firebaseUser: any, idToken: string) => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, isRetryingColdStart: false });
       console.log('[AuthStore] Processing Firebase user:', {
         email: firebaseUser.email,
         displayName: firebaseUser.displayName,
@@ -220,12 +222,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { API_BASE_URL } = require('../config/api');
       console.log(`[AuthStore] Firing POST to backend: ${API_BASE_URL}/auth/google`);
 
-      const result = await authApi.googleLogin({
-        idToken,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-        photo: firebaseUser.photoURL,
-      });
+      let result;
+      try {
+        result = await authApi.googleLogin({
+          idToken,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          photo: firebaseUser.photoURL,
+        });
+      } catch (firstError: any) {
+        const isNetworkError = 
+          firstError.message === 'Network Error' || 
+          firstError.code === 'ECONNABORTED' || 
+          !firstError.response;
+
+        if (isNetworkError) {
+          console.log('[AuthStore] First attempt failed with network error/timeout. Retrying in 5s (Render cold start)...');
+          set({ isRetryingColdStart: true });
+          
+          await new Promise<void>(resolve => setTimeout(resolve, 5000));
+          
+          try {
+            result = await authApi.googleLogin({
+              idToken,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+              photo: firebaseUser.photoURL,
+            });
+            console.log('[AuthStore] Retry successful!');
+          } catch (secondError: any) {
+            console.error('[AuthStore] Retry attempt failed:', secondError.message);
+            set({ isRetryingColdStart: false });
+            throw secondError;
+          }
+        } else {
+          throw firstError;
+        }
+      } finally {
+        set({ isRetryingColdStart: false });
+      }
 
       console.log('[AuthStore] Backend response:', {
         user: result.user,
@@ -334,3 +369,4 @@ setTokenRefreshCallback(async () => {
 export const useUser = () => useAuthStore((s) => s.user);
 export const useIsAuthenticated = () => useAuthStore((s) => s.isAuthenticated);
 export const useAuthLoading = () => useAuthStore((s) => s.isLoading);
+export const useIsRetryingColdStart = () => useAuthStore((s) => s.isRetryingColdStart);

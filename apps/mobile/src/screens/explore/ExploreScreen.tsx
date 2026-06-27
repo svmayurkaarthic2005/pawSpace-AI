@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Keyboard, Alert } from 'react-native';
+import { View, StyleSheet, StatusBar, Keyboard, Alert, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -256,7 +256,8 @@ export const ExploreScreen: React.FC = () => {
         <AISearchBar
           query={query}
           isFocused={isFocused}
-          isSearching={isSearching || isListening}
+          isSearching={isSearching}
+          isListening={isListening}
           onChangeText={handleQueryChange}
           onFocus={() => {
             setIsFocused(true);
@@ -277,6 +278,12 @@ export const ExploreScreen: React.FC = () => {
           onMicPress={handleMicPress}
           searchBarAnim={searchBarBorderAnim}
         />
+        {isListening && (
+          <View style={styles.listeningStatus}>
+            <ActivityIndicator size="small" color="#7C3AED" style={{ marginRight: 8 }} />
+            <Text style={styles.listeningText}>Listening...</Text>
+          </View>
+        )}
       </SafeAreaView>
 
       {/* Content Area */}
@@ -319,6 +326,21 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+  },
+  listeningStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  listeningText: {
+    color: '#EDE9FE',
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
   },
 });
 

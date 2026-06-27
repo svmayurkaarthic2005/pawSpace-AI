@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import {
   View,
   Text,
@@ -43,14 +44,13 @@ const CreateEventScreen: React.FC = () => {
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [locationInput, setLocationInput] = useState('');
   const [location, setLocation] = useState<string>('');
   const [coverImage, setCoverImage] = useState<{ uri: string; type: string; name: string } | null>(null);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
   // Custom pure-JS date/time picker
   const [datePickerTarget, setDatePickerTarget] = useState<'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
-  const [pickerTemp, setPickerTemp] = useState({ month: 1, day: 1, year: 2025, hour: 0, minute: 0 });
+  const [pickerTemp, setPickerTemp] = useState({ month: 1, day: 1, year: new Date().getFullYear(), hour: 0, minute: 0 });
   const [selectedSpecies, setSelectedSpecies] = useState<string[]>([]);
   const [maxAttendees, setMaxAttendees] = useState('');
   const [tags, setTags] = useState('');
@@ -69,6 +69,7 @@ const CreateEventScreen: React.FC = () => {
       if (!description.trim()) throw new Error('Description is required');
       if (!location) throw new Error('Location is required');
       if (selectedSpecies.length === 0) throw new Error('Select at least one pet type');
+      if (endDate <= startDate) throw new Error('End date must be after start date');
 
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -198,9 +199,6 @@ const CreateEventScreen: React.FC = () => {
           const maskedKey = apiKey ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : 'MISSING';
           console.log('🌍 Geocoding API URL called:', `${geocodeUrl}?latlng=${latitude},${longitude}&key=${maskedKey}`);
           
-          // Import axios dynamically if not at top level, or just use it if available
-          const axios = require('axios').default || require('axios');
-          
           const response = await axios.get(geocodeUrl, {
             params: {
               latlng: `${latitude},${longitude}`,
@@ -214,7 +212,6 @@ const CreateEventScreen: React.FC = () => {
           
           if (data.results && data.results[0]) {
             const address = data.results[0].formatted_address;
-            setLocationInput(address);
             setLocation(address);
             ReactNativeHapticFeedback.trigger('notificationSuccess');
           } else {
@@ -237,7 +234,6 @@ const CreateEventScreen: React.FC = () => {
           
           // Fallback logic
           const fallbackLocation = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-          setLocationInput(fallbackLocation);
           setLocation(fallbackLocation);
           
           if (Platform.OS === 'android') {
@@ -261,7 +257,6 @@ const CreateEventScreen: React.FC = () => {
       const { latitude, longitude } = mapRegion;
       const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
       const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json`;
-      const axios = require('axios').default || require('axios');
       const response = await axios.get(geocodeUrl, {
         params: { latlng: `${latitude},${longitude}`, key: apiKey },
         timeout: 10000
@@ -269,7 +264,6 @@ const CreateEventScreen: React.FC = () => {
       const data = response.data;
       if (data.results && data.results[0]) {
         const address = data.results[0].formatted_address;
-        setLocationInput(address);
         setLocation(address);
         ReactNativeHapticFeedback.trigger('notificationSuccess');
       } else {
@@ -278,7 +272,6 @@ const CreateEventScreen: React.FC = () => {
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       const fallbackLocation = `${mapRegion.latitude.toFixed(6)}, ${mapRegion.longitude.toFixed(6)}`;
-      setLocationInput(fallbackLocation);
       setLocation(fallbackLocation);
     } finally {
       setIsGeocoding(false);
@@ -623,6 +616,10 @@ const CreateEventScreen: React.FC = () => {
                   if (datePickerTarget === 'startDate') {
                     const d = new Date(startDate);
                     d.setFullYear(pickerTemp.year, pickerTemp.month - 1, pickerTemp.day);
+                    if (d < new Date()) {
+                      Alert.alert('Invalid Date', 'Start date cannot be in the past');
+                      return;
+                    }
                     setStartDate(d);
                   } else if (datePickerTarget === 'startTime') {
                     const d = new Date(startDate);

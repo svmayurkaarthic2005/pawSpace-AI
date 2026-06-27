@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../types';
+import { hasCompletedOnboarding } from '../utils/onboardingStorage';
 
 const { width: W } = Dimensions.get('window');
 const LOGO_SIZE = W * 0.38;
@@ -34,9 +35,18 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
   const glowScale = useSharedValue(0.7);
   const pulseScale = useSharedValue(1);
 
-  const navigate = () => {
-    navigation.replace('OnboardingWelcome');
-  };
+  const navigate = useCallback(async () => {
+    try {
+      const completed = await hasCompletedOnboarding();
+      if (completed) {
+        navigation.replace('Login');
+      } else {
+        navigation.replace('OnboardingWelcome');
+      }
+    } catch {
+      navigation.replace('OnboardingWelcome'); // fallback on error
+    }
+  }, [navigation]);
 
   useEffect(() => {
     // Fade-in + scale entrance
@@ -73,7 +83,8 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
   const logoAnimStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
     transform: [
-      { scale: logoScale.value * pulseScale.value },
+      { scale: logoScale.value },
+      { scale: pulseScale.value },
     ],
   }));
 

@@ -11,7 +11,6 @@ export interface CreateUserData {
   avatar?: string;
   profilePicture?: string;
   googleId?: string;
-  supabaseId?: string;
   isProfileComplete?: boolean;
 }
 

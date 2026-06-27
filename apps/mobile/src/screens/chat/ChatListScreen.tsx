@@ -25,14 +25,13 @@ export const ChatListScreen: React.FC = () => {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const userId = (user as any)?._id || user?.id;
+  const userId = user?._id || user?.id;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [dismissedBanner, setDismissedBanner] = useAsyncStorageState('dismissed_ai_banner', false);
 
   // Fetch chats
-  const { data: chatsData, isLoading, refetch } = useQuery({
+  const { data: chatsData, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['chats'],
     queryFn: () => api.get('/chats').then((r: any) => r.data.data),
     staleTime: 30_000,
@@ -85,17 +84,11 @@ export const ChatListScreen: React.FC = () => {
     };
 
     const handleNewMessage = ({ chatId }: any) => {
-      // Don't trigger a network refetch on every message —
-      // chat:list_update already keeps the list fresh via cache mutation.
-      // Only refetch if somehow the chat isn't in the list yet.
-      queryClient.setQueryData(['chats'], (old: any) => {
-        if (!old) return old;
-        const exists = old.some((c: any) => c._id === chatId);
-        if (!exists) {
-          queryClient.invalidateQueries({ queryKey: ['chats'] });
-        }
-        return old;
-      });
+      const currentChats = queryClient.getQueryData<any[]>(['chats']);
+      const exists = currentChats?.some((c: any) => c._id === chatId);
+      if (!exists) {
+        queryClient.invalidateQueries({ queryKey: ['chats'] });
+      }
     };
 
     socketService.on('chat:list_update', handleChatListUpdate);
@@ -189,8 +182,6 @@ export const ChatListScreen: React.FC = () => {
       <ChatListHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onSearchFocus={() => setIsSearchFocused(true)}
-        onSearchBlur={() => setIsSearchFocused(false)}
         onCompose={() => (navigation as any).navigate('NewChat')}
       />
 
@@ -206,7 +197,7 @@ export const ChatListScreen: React.FC = () => {
           ItemSeparatorComponent={renderSeparator}
           refreshControl={
             <RefreshControl
-              refreshing={isLoading}
+              refreshing={isRefetching}
               onRefresh={refetch}
               tintColor="#7C3AED"
               colors={['#7C3AED']}

@@ -1,51 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext HTTP traffic to local development servers -->
-    <!-- IMPORTANT: This is for development only. Production should use HTTPS. -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Android emulator alias for host machine -->
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        
-        <!-- localhost variants -->
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        
-        <!-- Common private IP ranges for physical device development -->
-        <!-- Class A: 10.0.0.0 - 10.255.255.255 -->
-        <domain includeSubdomains="false">10.0.0.0</domain>
-        
-        <!-- Class B: 172.16.0.0 - 172.31.255.255 -->
-        <domain includeSubdomains="false">172.16.0.0</domain>
-        <domain includeSubdomains="false">172.17.0.0</domain>
-        <domain includeSubdomains="false">172.18.0.0</domain>
-        <domain includeSubdomains="false">172.19.0.0</domain>
-        <domain includeSubdomains="false">172.20.0.0</domain>
-        <domain includeSubdomains="false">172.21.0.0</domain>
-        <domain includeSubdomains="false">172.22.0.0</domain>
-        <domain includeSubdomains="false">172.23.0.0</domain>
-        <domain includeSubdomains="false">172.24.0.0</domain>
-        <domain includeSubdomains="false">172.25.0.0</domain>
-        <domain includeSubdomains="false">172.26.0.0</domain>
-        <domain includeSubdomains="false">172.27.0.0</domain>
-        <domain includeSubdomains="false">172.28.0.0</domain>
-        <domain includeSubdomains="false">172.29.0.0</domain>
-        <domain includeSubdomains="false">172.30.0.0</domain>
-        <domain includeSubdomains="false">172.31.0.0</domain>
-        
-        <!-- Class C: 192.168.0.0 - 192.168.255.255 (most common home networks) -->
-        <domain includeSubdomains="false">192.168.0.0</domain>
-        <domain includeSubdomains="false">192.168.1.0</domain>
-        <domain includeSubdomains="false">192.168.1.33</domain>
-        <domain includeSubdomains="false">192.168.2.0</domain>
-        <domain includeSubdomains="false">192.168.56.0</domain>
-        <domain includeSubdomains="false">192.168.100.0</domain>
-        <domain includeSubdomains="false">192.168.128.0</domain>
-    </domain-config>
-    
-    <!-- For production builds, enforce HTTPS -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
 </network-security-config>

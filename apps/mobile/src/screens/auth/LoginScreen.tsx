@@ -19,7 +19,7 @@ import * as yup from 'yup';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import { AuthStackParamList } from '../../types';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore, useIsRetryingColdStart } from '../../store/authStore';
 import { authApi } from '../../services/auth.service';
 import { signInWithGoogle, getIdToken } from '../../services/firebaseAuth.service';
 import GlassCard from '../../components/ui/GlassCard';
@@ -44,7 +44,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { handleFirebaseUser } = useAuthStore();
+  const { handleFirebaseUser, login: authStoreLogin } = useAuthStore();
+  const isRetryingColdStart = useIsRetryingColdStart();
 
   const {
     control,
@@ -61,9 +62,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         email: data.email,
         password: data.password,
       });
-      
-      // Login is handled in the auth service
-      // The user will be automatically logged in
+      console.log('[LoginScreen] Email login response:', response);
+
+      // Update auth store so the navigator redirects to the main app
+      await authStoreLogin(response.user, response.accessToken, response.refreshToken);
     } catch (err: unknown) {
       const message = (err as Error).message || 'Login failed. Please try again.';
       Alert.alert('Login Failed', message);
@@ -87,9 +89,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
       // Sync with backend
       await handleFirebaseUser(firebaseUser, idToken);
-      
-      console.log('[LoginScreen] Successfully signed in!');
-      Alert.alert('Success', 'Signed in successfully!');
+
+      console.log('[LoginScreen] Successfully signed in — navigator will redirect automatically.');
     } catch (err: unknown) {
       console.error('[LoginScreen] Google sign-in error:', err);
       const error = err as any;
@@ -209,7 +210,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               )}
             />
 
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
@@ -245,7 +249,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               disabled={isGoogleLoading || isSubmitting}
             >
               {isGoogleLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={styles.googleBtnText}>
+                    {isRetryingColdStart ? 'Connecting to server...' : 'Signing in...'}
+                  </Text>
+                </View>
               ) : (
                 <>
                   <Icon name="logo-google" size={24} color="#FFFFFF" />

@@ -132,10 +132,8 @@ dependencies {
     // Google Maps
     implementation 'com.google.android.gms:play-services-maps:18.2.0'
     
-    // Firebase BOM - manages Firebase SDK versions
-    implementation platform('com.google.firebase:firebase-bom:32.8.0')
-    
-    // Firebase services
+    // Firebase services are managed by react-native-firebase (BOM 34.10.0)
+    // Do NOT declare a separate BOM here — it conflicts with the plugin-managed version
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'com.google.firebase:firebase-messaging'

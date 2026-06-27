@@ -20,74 +20,11 @@ import { AuthStackParamList } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/auth.service';
 import { FONT_SIZE, SPACING } from '../../constants';
+import StepIndicator from '../../components/ui/StepIndicator';
 
 // ─── Auth palette ─────────────────────────────────────────────────────────────
 const AUTH_PRIMARY = '#7C3AED';
 const AUTH_SECONDARY = '#8B5CF6';
-
-// ─── Step Indicator (shared style) ───────────────────────────────────────────
-const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, total }) => (
-  <View style={stepStyles.row}>
-    {Array.from({ length: total }).map((_, i) => {
-      const step = i + 1;
-      const active = step === current;
-      const done = step < current;
-      return (
-        <React.Fragment key={step}>
-          <View style={[stepStyles.circle, (active || done) && stepStyles.circleActive]}>
-            <Text style={[stepStyles.circleText, (active || done) && stepStyles.circleTextActive]}>
-              {step}
-            </Text>
-          </View>
-          {step < total && (
-            <View style={[stepStyles.line, done && stepStyles.lineActive]} />
-          )}
-        </React.Fragment>
-      );
-    })}
-  </View>
-);
-
-const stepStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  circle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circleActive: {
-    backgroundColor: AUTH_PRIMARY,
-    borderColor: AUTH_PRIMARY,
-  },
-  circleText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-  },
-  circleTextActive: {
-    color: '#FFFFFF',
-  },
-  line: {
-    flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    marginHorizontal: 4,
-    maxWidth: 48,
-  },
-  lineActive: {
-    backgroundColor: AUTH_PRIMARY,
-  },
-});
 
 // ─── Species options ──────────────────────────────────────────────────────────
 const SPECIES = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'] as const;
@@ -98,7 +35,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'AddPet'>;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { name, username, email, password } = (route.params ?? {}) as any;
+  const { name, username, email, password } = route.params;
   const loginAction = useAuthStore((s) => s.login);
 
   const [petName, setPetName] = useState('');
@@ -115,29 +52,13 @@ const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
   const handlePickPhoto = async () => {
     try {
       const result = await launchImageLibrary({
-        mediaType: 'mixed',
+        mediaType: 'photo',
         quality: 0.8,
-        videoQuality: 'high',
         selectionLimit: 1,
       });
 
-      if (result.assets?.[0]) {
-        const asset = result.assets[0];
-        
-        // Validate video duration (max 59 seconds)
-        if (asset.type?.startsWith('video') && asset.duration) {
-          if (asset.duration > 59) {
-            Alert.alert(
-              'Video Too Long',
-              `Videos must be 59 seconds or less. The selected video is ${Math.round(asset.duration)} seconds long.`
-            );
-            return;
-          }
-        }
-
-        if (asset.uri) {
-          setPhotoUri(asset.uri);
-        }
+      if (result.assets?.[0]?.uri) {
+        setPhotoUri(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking photo:', error);
@@ -154,15 +75,28 @@ const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setIsSubmitting(true);
     try {
-      const result = await authApi.register({
-        name,
-        username,
-        email,
-        password,
-        ...(!skipPet && petName.trim()
-          ? { pet: { name: petName.trim(), species, breed: breed.trim(), age } }
-          : {}),
-      });
+      // Build FormData to support optional pet photo upload
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('username', username);
+      formData.append('email', email);
+      formData.append('password', password);
+
+      if (!skipPet && petName.trim()) {
+        formData.append('pet[name]', petName.trim());
+        formData.append('pet[species]', species);
+        formData.append('pet[breed]', breed.trim());
+        formData.append('pet[age]', String(age));
+        if (photoUri) {
+          formData.append('pet[photo]', {
+            uri: photoUri,
+            type: 'image/jpeg',
+            name: `pet_${Date.now()}.jpg`,
+          } as any);
+        }
+      }
+
+      const result = await authApi.register(formData);
       await loginAction(result.user, result.accessToken, result.refreshToken);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string; code?: string } } };
@@ -328,7 +262,7 @@ const AddPetScreen: React.FC<Props> = ({ navigation, route }) => {
 
               <TouchableOpacity
                 style={styles.stepperBtn}
-                onPress={() => setAge((v) => v + 1)}
+                onPress={() => setAge((v) => Math.min(30, v + 1))}
                 activeOpacity={0.8}
               >
                 <Text style={styles.stepperIcon}>+</Text>

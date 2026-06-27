@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ScrollView, ActivityIndicator, useColorScheme,
+  ScrollView, ActivityIndicator, useColorScheme, Dimensions, Alert,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { useTheme } from '../../constants/theme';
-import { formatCount } from '../../utils';
+import { formatCount, timeAgo } from '../../utils';
 
 type Props = NativeStackScreenProps<any, 'Communities'>;
 
@@ -30,6 +30,9 @@ interface Community {
 
 const SPECIES_FILTERS = ['All', 'Dogs', 'Cats', 'Birds', 'Rabbits'];
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = (SCREEN_WIDTH - 32 - 12) / 2; // 32 = horizontal padding * 2, 12 = gap
+
 const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, spacing } = useTheme();
   const queryClient = useQueryClient();
@@ -47,7 +50,10 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
   const { data: discoverCommunities = [], isLoading: discoverLoading } = useQuery({
     queryKey: ['discoverCommunities', speciesFilter],
     queryFn: async () => {
-      const params = speciesFilter !== 'All' ? `?species=${speciesFilter.toLowerCase().slice(0, -1)}` : '';
+      const SPECIES_SLUG: Record<string, string> = {
+        Dogs: 'dog', Cats: 'cat', Birds: 'bird', Rabbits: 'rabbit',
+      };
+      const params = speciesFilter !== 'All' ? `?species=${SPECIES_SLUG[speciesFilter] ?? speciesFilter.toLowerCase()}` : '';
       const { data } = await api.get(`/communities/discover${params}`);
       return data.data as Community[];
     },
@@ -59,6 +65,9 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['myCommunities'] });
       void queryClient.invalidateQueries({ queryKey: ['discoverCommunities'] });
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to join community. Please try again.');
     },
   });
 
@@ -95,7 +104,7 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
           ))}
         </View>
         <Text style={[styles.communityMeta, { color: subColor }]}>
-          {formatCount(item.memberCount ?? 0)} members · New post {item.lastPost ? '2h ago' : 'recently'}
+          {formatCount(item.memberCount ?? 0)} members · New post {item.lastPost ? timeAgo(item.lastPost.createdAt) : 'No posts yet'}
         </Text>
       </View>
       {item.isMember ? (
@@ -122,10 +131,18 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
       <Text style={[styles.discoverName, { color: textColor }]} numberOfLines={2}>{item.name}</Text>
       <Text style={[styles.discoverMeta, { color: subColor }]}>{formatCount(item.memberCount ?? 0)} members</Text>
       <TouchableOpacity
-        style={[styles.joinBtn, { backgroundColor: colors.primary }]}
-        onPress={() => joinMutation.mutate(item._id)}
+        style={[styles.joinBtn, { backgroundColor: joinMutation.isPending ? 'rgba(124,58,237,0.5)' : colors.primary }]}
+        disabled={joinMutation.isPending}
+        onPress={(e) => {
+          e.stopPropagation();
+          joinMutation.mutate(item._id);
+        }}
       >
-        <Text style={styles.joinBtnText}>Join</Text>
+        {joinMutation.isPending ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.joinBtnText}>{item.isMember ? 'Joined' : 'Join'}</Text>
+        )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -136,10 +153,16 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
       <View style={[styles.header, { backgroundColor: bg }]}>
         <Text style={[styles.headerTitle, { color: textColor }]}>Communities</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn}>
+          <TouchableOpacity 
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('SmartSearch')}
+          >
             <Text style={[styles.headerBtnIcon, { color: textColor }]}>🔍</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn}>
+          <TouchableOpacity 
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('CreateCommunity')}
+          >
             <Text style={[styles.headerBtnIcon, { color: textColor }]}>✏️</Text>
           </TouchableOpacity>
         </View>
@@ -217,7 +240,7 @@ const CommunitiesScreen: React.FC<Props> = ({ navigation }) => {
             ) : (
               <View style={styles.discoverGrid}>
                 {discoverCommunities.slice(0, 4).map((item: Community) => (
-                  <View key={item._id} style={{ width: '48%' }}>
+                  <View key={item._id} style={{ width: CARD_WIDTH }}>
                     {renderDiscoverCard({ item })}
                   </View>
                 ))}

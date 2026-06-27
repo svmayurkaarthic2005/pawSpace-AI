@@ -2,6 +2,7 @@
 
 export interface User {
   id: string;
+  _id?: string;
   email: string;
   username: string;
   displayName: string;
@@ -79,6 +80,8 @@ export type NotificationType =
   | 'like'
   | 'comment'
   | 'follow'
+  | 'follow_request'
+  | 'follow_accept'
   | 'event_rsvp'
   | 'chat'
   | 'ai_suggestion'

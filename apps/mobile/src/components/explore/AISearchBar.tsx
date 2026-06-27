@@ -17,6 +17,7 @@ interface AISearchBarProps {
   query: string;
   isFocused: boolean;
   isSearching?: boolean;
+  isListening?: boolean;
   onChangeText: (text: string) => void;
   onFocus: () => void;
   onBlur: () => void;
@@ -30,6 +31,7 @@ export const AISearchBar: React.FC<AISearchBarProps> = ({
   query,
   isFocused,
   isSearching = false,
+  isListening = false,
   onChangeText,
   onFocus,
   onBlur,
@@ -86,6 +88,20 @@ export const AISearchBar: React.FC<AISearchBarProps> = ({
           <View style={styles.listeningContainer}>
             <ActivityIndicator size="small" color="#7C3AED" />
           </View>
+        ) : isListening ? (
+          onMicPress && (
+            <TouchableOpacity 
+              onPress={onMicPress} 
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              style={styles.micActive}
+            >
+              <Icon 
+                name="mic" 
+                size={20} 
+                color="#7C3AED" 
+              />
+            </TouchableOpacity>
+          )
         ) : query.length > 0 ? (
           <TouchableOpacity onPress={onClear} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
             <Icon name="close-circle" size={20} color="#6B7280" />
@@ -95,12 +111,11 @@ export const AISearchBar: React.FC<AISearchBarProps> = ({
             <TouchableOpacity 
               onPress={onMicPress} 
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-              style={isSearching ? styles.micActive : undefined}
             >
               <Icon 
-                name={isSearching ? "mic" : "mic-outline"} 
+                name="mic-outline" 
                 size={20} 
-                color={isSearching ? "#EF4444" : "#9CA3AF"} 
+                color="#9CA3AF" 
               />
             </TouchableOpacity>
           )

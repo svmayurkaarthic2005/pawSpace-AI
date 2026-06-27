@@ -136,13 +136,15 @@ app.get('/health', async (_req: Request, res: Response) => {
     warnings: warnings.length > 0 ? warnings : undefined,
   });
 });
-
 // ─── Ping (Cron keep-alive) ───────────────────────────────────────────────────
 
 app.get('/ping', (_req: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
+app.get('/api/v1/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 // ─── FCM Token Update ─────────────────────────────────────────────────────────
 
 import { authenticate } from './middleware/auth';

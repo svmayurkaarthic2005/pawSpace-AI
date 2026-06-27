@@ -9,6 +9,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import AddPetScreen from '../screens/auth/AddPetScreen';
 import CompleteProfileScreen from '../screens/auth/CompleteProfileScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -62,6 +63,7 @@ const AuthStack: React.FC<Props> = ({ route }) => {
         component={CompleteProfileScreen as any} 
       />
       <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 };

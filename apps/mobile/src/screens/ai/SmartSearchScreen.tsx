@@ -1,14 +1,16 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator, useColorScheme, ScrollView,
-  StatusBar, Keyboard,
+  StatusBar, Keyboard, Animated,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { aiApi, SearchResults } from '../../services/ai.service';
 import { FONT_SIZE, SPACING } from '../../constants';
 import { timeAgo } from '../../utils';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 
 type Props = NativeStackScreenProps<any, 'SmartSearch'>;
 
@@ -20,9 +22,100 @@ const EXAMPLE_QUERIES = [
   'Puppy training classes',
 ];
 
-const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
+// ─── Skeleton Loading Components ───────────────────────────────────────────────
+
+const SkeletonCard: React.FC<{ cardBg: string }> = ({ cardBg }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [opacity]);
+
+  return (
+    <Animated.View style={[styles.resultCard, { backgroundColor: cardBg, opacity }]}>
+      <View style={[styles.skeletonThumb, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+      <View style={styles.resultContent}>
+        <View style={[styles.skeletonLine, { width: '80%', backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+      </View>
+    </Animated.View>
+  );
+};
+
+const SkeletonLoader: React.FC<{ cardBg: string }> = ({ cardBg }) => (
+  <View style={{ paddingHorizontal: SPACING.md }}>
+    <SkeletonCard cardBg={cardBg} />
+    <SkeletonCard cardBg={cardBg} />
+    <SkeletonCard cardBg={cardBg} />
+  </View>
+);
+
+// ─── Pulsing Mic Button ──────────────────────────────────────────────────────────
+
+const PulsingMicButton: React.FC<{
+  isListening: boolean;
+  onPress: () => void;
+  subColor: string;
+}> = ({ isListening, onPress, subColor }) => {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let anim: Animated.CompositeAnimation | null = null;
+    if (isListening) {
+      anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, {
+            toValue: 0.4,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      anim.start();
+    } else {
+      opacity.setValue(1);
+    }
+    return () => {
+      if (anim) anim.stop();
+    };
+  }, [isListening, opacity]);
+
+  return (
+    <TouchableOpacity onPress={onPress} style={{ paddingHorizontal: 4 }} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+      <Animated.View style={{ opacity }}>
+        <Icon
+          name="mic-outline"
+          size={20}
+          color={isListening ? '#7C3AED' : subColor}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// ─── Smart Search Screen ───────────────────────────────────────────────────────
+
+const SmartSearchScreen: React.FC<Props> = ({ route, navigation }) => {
   const isDark = useColorScheme() === 'dark';
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState((route?.params as any)?.initialQuery || '');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +144,36 @@ const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [query]);
 
+  // Voice Input Setup
+  const { isListening, transcript, startListening, stopListening, clearTranscript } = useVoiceInput();
+
+  useEffect(() => {
+    if (transcript) {
+      setQuery(transcript);
+      void handleSearch(transcript);
+      clearTranscript();
+    }
+  }, [transcript, handleSearch, clearTranscript]);
+
+  useEffect(() => {
+    const initQ = (route?.params as any)?.initialQuery;
+    if (initQ) {
+      void handleSearch(initQ);
+    }
+  }, [route?.params, handleSearch]);
+
+  const handleMicPress = async () => {
+    try {
+      if (isListening) {
+        await stopListening();
+      } else {
+        await startListening();
+      }
+    } catch (e) {
+      console.warn('[SmartSearch] Voice error:', e);
+    }
+  };
+
   // Filter chips from parsed query
   const filterChips = results?.parsedQuery.filters
     ? Object.entries(results.parsedQuery.filters)
@@ -68,28 +191,44 @@ const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
     startDate: string; location: { name: string }; rsvpCount: number;
   }>;
 
-  const renderPost = ({ item }: { item: typeof posts[0] }) => (
-    <TouchableOpacity style={[styles.resultCard, { backgroundColor: cardBg }]}>
-      {item.media[0] && (
-        <FastImage
-          source={{ uri: item.media[0].url, priority: FastImage.priority.normal }}
-          style={styles.postThumb}
-          resizeMode={FastImage.resizeMode.cover}
-        />
-      )}
-      <View style={styles.resultContent}>
-        <Text style={[styles.resultTitle, { color: textColor }]} numberOfLines={2}>
-          {item.caption || 'No caption'}
-        </Text>
-        <Text style={[styles.resultMeta, { color: subColor }]}>
-          @{item.author.username} · {timeAgo(item.createdAt)} · ❤️ {item.likesCount}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderPost = ({ item }: { item: typeof posts[0] }) => {
+    const avatarUrl = item.author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.author.username)}&background=7C3AED&color=fff&size=80`;
+
+    return (
+      <TouchableOpacity
+        style={[styles.resultCard, { backgroundColor: cardBg }]}
+        onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
+      >
+        {item.media[0] && (
+          <FastImage
+            source={{ uri: item.media[0].url, priority: FastImage.priority.normal }}
+            style={styles.postThumb}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+        )}
+        <View style={styles.resultContent}>
+          <Text style={[styles.resultTitle, { color: textColor }]} numberOfLines={2}>
+            {item.caption || 'No caption'}
+          </Text>
+          <View style={styles.authorRow}>
+            <FastImage
+              source={{ uri: avatarUrl }}
+              style={styles.authorAvatar}
+            />
+            <Text style={[styles.resultMeta, { color: subColor }]} numberOfLines={1}>
+              @{item.author.username} · {timeAgo(item.createdAt)} · ❤️ {item.likesCount}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderEvent = ({ item }: { item: typeof events[0] }) => (
-    <TouchableOpacity style={[styles.resultCard, { backgroundColor: cardBg }]}>
+    <TouchableOpacity
+      style={[styles.resultCard, { backgroundColor: cardBg }]}
+      onPress={() => navigation.navigate('EventDetail', { eventId: item._id })}
+    >
       <View style={styles.eventIcon}>
         <Text style={styles.eventIconText}>📅</Text>
       </View>
@@ -148,10 +287,15 @@ const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
           autoFocus
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')}>
+          <TouchableOpacity onPress={() => setQuery('')} style={{ paddingHorizontal: 4 }}>
             <Text style={{ color: subColor, fontSize: 16 }}>✕</Text>
           </TouchableOpacity>
         )}
+        <PulsingMicButton
+          isListening={isListening}
+          onPress={handleMicPress}
+          subColor={subColor}
+        />
       </View>
 
       {/* Search Button */}
@@ -196,6 +340,22 @@ const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
         </ScrollView>
       )}
 
+      {/* AI Intent Banner */}
+      {results && (
+        <View style={styles.intentBanner}>
+          <Text style={styles.intentText}>
+            ✦ {results.parsedQuery.intent ?? results.parsedQuery.originalQuery}
+          </Text>
+        </View>
+      )}
+
+      {/* Result Count Summary */}
+      {results && (
+        <Text style={[styles.countSummary, { color: subColor }]}>
+          Found {allResults.length} results for "{results.parsedQuery.originalQuery || query}"
+        </Text>
+      )}
+
       {/* Results tabs */}
       {results && (
         <View style={styles.tabRow}>
@@ -220,27 +380,41 @@ const SmartSearchScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Results */}
-      {results && (
-        <FlatList
-          data={filteredResults}
-          keyExtractor={(item) => `${item.type}_${(item.data as { _id: string })._id}`}
-          renderItem={({ item }) =>
-            item.type === 'post'
-              ? renderPost({ item: item.data as typeof posts[0] })
-              : renderEvent({ item: item.data as typeof events[0] })
-          }
-          contentContainerStyle={styles.resultsList}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyResults}>
-              <Text style={{ color: subColor, fontSize: FONT_SIZE.md }}>No results found</Text>
-              <Text style={{ color: subColor, fontSize: FONT_SIZE.sm, marginTop: 4 }}>
-                Try a different search query
-              </Text>
-            </View>
-          }
-        />
+      {/* Results or Loading */}
+      {isSearching ? (
+        <SkeletonLoader cardBg={cardBg} />
+      ) : (
+        results && (
+          <FlatList
+            data={filteredResults}
+            keyExtractor={(item) => `${item.type}_${(item.data as { _id: string })._id}`}
+            renderItem={({ item }) =>
+              item.type === 'post'
+                ? renderPost({ item: item.data as typeof posts[0] })
+                : renderEvent({ item: item.data as typeof events[0] })
+            }
+            contentContainerStyle={styles.resultsList}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyResults}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>🐾</Text>
+                <Text style={[styles.emptyTitle, { color: textColor }]}>No results found</Text>
+                <Text style={[styles.emptySubtitle, { color: subColor }]}>
+                  Try: 'dog parks near me' or 'cat adoption events'
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => {
+                    setQuery('');
+                    setResults(null);
+                  }}
+                >
+                  <Text style={styles.retryBtnText}>Clear & retry</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        )
       )}
     </View>
   );
@@ -291,6 +465,26 @@ const styles = StyleSheet.create({
     paddingVertical: 3, marginRight: SPACING.xs,
   },
   filterChipText: { color: '#7C3AED', fontSize: 11, fontWeight: '600' },
+  intentBanner: {
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.2)',
+  },
+  intentText: {
+    color: '#7C3AED',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  countSummary: {
+    fontSize: 12,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.xs,
+  },
   tabRow: {
     flexDirection: 'row', paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm, gap: SPACING.xs,
@@ -321,7 +515,45 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: FONT_SIZE.sm, fontWeight: '700', marginBottom: 3 },
   resultMeta: { fontSize: 11, marginBottom: 3 },
   resultDesc: { fontSize: 11, lineHeight: 16 },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  authorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
   emptyResults: { alignItems: 'center', paddingTop: 60 },
+  emptyTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: FONT_SIZE.sm,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  retryBtn: {
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.3)',
+  },
+  retryBtnText: {
+    color: '#7C3AED',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  skeletonThumb: { width: 72, height: 72, borderRadius: 10 },
+  skeletonLine: { height: 16, borderRadius: 4 },
 });
 
 export default SmartSearchScreen;
